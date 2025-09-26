@@ -109,9 +109,9 @@ We welcome contributions from CSE students! Here's how you can help:
 ## 📞 Support
 
 For support, questions, or feature requests, please contact:
-- Email: support@cseresources.com
+- Email: meghabakale5@gmail.com
 - GitHub Issues: [Create an issue](https://github.com/your-repo/issues)
 
 ---
 
-**Made with ❤️ for CSE students by CSE students**
+**Made for CSE students by CSE students**
