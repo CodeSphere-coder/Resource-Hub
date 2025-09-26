@@ -105,9 +105,6 @@ We welcome contributions from CSE students! Here's how you can help:
 2. **Report Issues**: Help us improve by reporting bugs or suggesting features
 3. **Code Contributions**: Submit pull requests for new features or improvements
 
-## 📄 License
-
-This project is open source and available under the [MIT License](LICENSE).
 
 ## 📞 Support
 
