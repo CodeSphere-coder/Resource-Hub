@@ -36,7 +36,7 @@ const Navbar: React.FC = () => {
         <div className="flex justify-between items-center h-16">
           <Link to="/" className="flex items-center space-x-2">
             <BookOpen className="h-8 w-8 text-blue-600" />
-            <span className="text-xl font-bold text-gray-900">CSE Resources</span>
+            <span className="text-xl font-bold text-gray-900">ResourceHub</span>
           </Link>
 
           <div className="hidden md:flex items-center space-x-8">
