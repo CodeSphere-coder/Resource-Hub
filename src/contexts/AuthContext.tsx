@@ -23,6 +23,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signup = async (userData: SignupData) => {
     const { email, password, username, role, usn, semester, subjects } = userData;
+    const ADMIN_EMAIL = 'sksvmacet@gmail.com';
+    if (role === 'admin' && email !== ADMIN_EMAIL) {
+      throw new Error('Only the designated admin email can sign up as admin.');
+    }
     
     // Create Firebase Auth user
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
@@ -45,6 +49,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } else if (role === 'teacher' && subjects) {
       (userProfileData as any).subjects = subjects;
     } else if (role === 'admin') {
+      // Additional hardening: enforce admin email matches exactly on profile creation
+      (userProfileData as any).email = ADMIN_EMAIL;
       (userProfileData as any).permissions = ['manage_users', 'manage_resources', 'manage_system'];
     }
 

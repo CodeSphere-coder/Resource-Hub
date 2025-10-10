@@ -17,6 +17,14 @@ const HeroSection: React.FC = () => {
 
       {/* Content */}
       <div className="relative z-10 text-center text-white px-6 max-w-4xl">
+
+        
+        {/* Logo */}
+  <img 
+    src="/logo.jpg" // <-- make sure this image is placed in the /public folder
+    alt="Site Logo"
+    className="mx-auto mb-6 w-24 h-auto" // adjust size as needed
+  />
         <h1 className="text-5xl font-bold mb-4">
           CS & Engineering <br />
           <span className="text-blue-300">Resource Hub</span>
@@ -79,6 +87,14 @@ const Home: React.FC = () => {
 
   return (
     <div className="min-h-screen">
+      
+       {/* Horizontal College Image */}
+       <img
+          src="/agadiclg.jpg" // Make sure the image is in your /public folder
+          alt="College Banner"
+          className="w-full max-w-3xl mx-auto mb-8 rounded-lg shadow-lg"
+        />
+
       {/* Hero Section */}
       <HeroSection />
 

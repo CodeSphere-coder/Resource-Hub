@@ -42,12 +42,30 @@ const Signup: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Username: only letters
+    if (!/^[A-Za-z]+$/.test(username)) {
+      return setError('Username must contain letters only (no numbers or special characters).');
+    }
+
+    // Email: must end with @gmail.com (case-insensitive)
+    if (!/^[^\s@]+@gmail\.com$/i.test(email)) {
+      return setError('Email must be a valid Gmail address ending with @gmail.com.');
+    }
+
     if (password !== confirmPassword) {
       return setError('Passwords do not match');
     }
 
     if (password.length < 6) {
       return setError('Password must be at least 6 characters long');
+    }
+
+    // USN (students only): exactly 2KA + 2 digits + CS + 3 digits (e.g., 2KA23CS041)
+    if (role === 'student') {
+      const normalizedUsn = (usn || '').toUpperCase();
+      if (!/^2KA\d{2}CS\d{3}$/.test(normalizedUsn)) {
+        return setError('USN must be exactly 2KA + 2 digits + CS + 3 digits (e.g., 2KA23CS041).');
+      }
     }
     
     try {
