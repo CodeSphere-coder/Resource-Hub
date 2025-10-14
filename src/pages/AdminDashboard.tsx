@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { Users, Shield, FileText, TrendingUp, AlertTriangle, CheckCircle, Activity } from 'lucide-react';
+import { Users, Shield, FileText, TrendingUp, AlertTriangle, CheckCircle, Activity, Upload } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { collection, deleteDoc, doc, getDocs, orderBy, query, updateDoc, where } from 'firebase/firestore';
 import { deleteObject, ref as storageRef } from 'firebase/storage';
@@ -160,6 +160,7 @@ const AdminDashboard: React.FC = () => {
   ];
 
   const quickActions = [
+    { title: 'Upload Resources', description: 'Upload campus resources as admin', icon: <Upload className="h-6 w-6" />, href: '/admin/upload', color: 'bg-green-500' },
     { title: 'User Management', description: 'Manage users and permissions', icon: <Users className="h-6 w-6" />, href: '/admin/users', color: 'bg-blue-500' },
     { title: 'Content Moderation', description: 'Review and approve content', icon: <Shield className="h-6 w-6" />, href: '/admin/moderation', color: 'bg-red-500' },
     { title: 'System Analytics', description: 'View platform statistics', icon: <TrendingUp className="h-6 w-6" />, href: '/admin/analytics', color: 'bg-green-500' },
