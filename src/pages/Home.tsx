@@ -98,59 +98,63 @@ const Home: React.FC = () => {
       {/* Hero Section */}
       <HeroSection />
 
-      {/* Vision & Mission Section */}
-<section className="py-20 bg-blue-50">
+       {/* Vision & Mission Section */}
+<section className="py-16 sm:py-20 bg-blue-50">
   <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-    <div className="bg-white rounded-2xl shadow-lg p-10 border border-blue-200">
-      <div className="text-center mb-12">
-        <h2 className="text-4xl font-bold text-blue-700 mb-4">Vision & Mission</h2>
-        <p className="text-lg text-gray-600">
+    <div className="bg-white rounded-2xl shadow-lg p-8 sm:p-10 border border-blue-200">
+      <div className="text-center mb-10 sm:mb-12">
+        <h2 className="text-3xl sm:text-4xl font-bold text-blue-700 mb-3 sm:mb-4">Vision & Mission</h2>
+        <p className="text-base sm:text-lg text-gray-600 max-w-3xl mx-auto">
           Our guiding principles and goals to empower the next generation of technocrats.
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12">
         {/* Vision */}
-        <div>
-          <div className="flex items-center gap-3 mb-4">
-            <Eye className="h-6 w-6 text-blue-600" />
-            <h3 className="text-2xl font-semibold text-gray-800">Vision</h3>
+        <div className="bg-blue-100 rounded-lg p-6 sm:p-8 shadow-md hover:shadow-lg transition-shadow duration-300">
+          <div className="flex items-center gap-4 mb-5">
+            <div className="bg-blue-600 text-white rounded-full p-3">
+              <Eye className="h-6 w-6 sm:h-7 sm:w-7" />
+            </div>
+            <h3 className="text-xl sm:text-2xl font-semibold text-gray-900">Vision</h3>
           </div>
-          <p className="text-gray-700 text-lg leading-relaxed bg-blue-100 p-4 rounded-lg">
+          <p className="text-gray-800 text-base sm:text-lg leading-relaxed">
             Aspire to become a preferred institute by transforming rural youths into global technocrats through continual excellence in engineering education, innovation, lifelong learning, and ethical values.
           </p>
         </div>
 
         {/* Mission */}
-        <div>
-          <div className="flex items-center gap-3 mb-4">
-            <Target className="h-6 w-6 text-blue-600" />
-            <h3 className="text-2xl font-semibold text-gray-800">Mission</h3>
+        <div className="bg-blue-100 rounded-lg p-6 sm:p-8 shadow-md hover:shadow-lg transition-shadow duration-300">
+          <div className="flex items-center gap-4 mb-5">
+            <div className="bg-blue-600 text-white rounded-full p-3">
+              <Target className="h-6 w-6 sm:h-7 sm:w-7" />
+            </div>
+            <h3 className="text-xl sm:text-2xl font-semibold text-gray-900">Mission</h3>
           </div>
-          <ul className="space-y-4">
-            <li className="flex items-start gap-3 bg-blue-100 p-4 rounded-lg">
-              <CheckCircle className="text-blue-600 mt-1" />
-              <span className="text-gray-700 text-lg leading-relaxed">
+          <ul className="space-y-5">
+            <li className="flex items-start gap-4">
+              <CheckCircle className="text-blue-600 mt-1 h-5 w-5 sm:h-6 sm:w-6 flex-shrink-0" />
+              <p className="text-gray-800 text-base sm:text-lg leading-relaxed">
                 To inculcate outcome-based quality education in engineering through experiential learning with state-of-the-art infrastructure.
-              </span>
+              </p>
             </li>
-            <li className="flex items-start gap-3 bg-blue-100 p-4 rounded-lg">
-              <Lightbulb className="text-blue-600 mt-1" />
-              <span className="text-gray-700 text-lg leading-relaxed">
+            <li className="flex items-start gap-4">
+              <Lightbulb className="text-blue-600 mt-1 h-5 w-5 sm:h-6 sm:w-6 flex-shrink-0" />
+              <p className="text-gray-800 text-base sm:text-lg leading-relaxed">
                 To promote industry-institute collaborations to encourage innovations in thrust areas by providing an ecosystem.
-              </span>
+              </p>
             </li>
-            <li className="flex items-start gap-3 bg-blue-100 p-4 rounded-lg">
-              <Users className="text-blue-600 mt-1" />
-              <span className="text-gray-700 text-lg leading-relaxed">
+            <li className="flex items-start gap-4">
+              <Users className="text-blue-600 mt-1 h-5 w-5 sm:h-6 sm:w-6 flex-shrink-0" />
+              <p className="text-gray-800 text-base sm:text-lg leading-relaxed">
                 To emphasize on cutting-edge technologies that are sustainable and beneficial to different sectors of society.
-              </span>
+              </p>
             </li>
-            <li className="flex items-start gap-3 bg-blue-100 p-4 rounded-lg">
-              <CheckCircle className="text-blue-600 mt-1" />
-              <span className="text-gray-700 text-lg leading-relaxed">
+            <li className="flex items-start gap-4">
+              <CheckCircle className="text-blue-600 mt-1 h-5 w-5 sm:h-6 sm:w-6 flex-shrink-0" />
+              <p className="text-gray-800 text-base sm:text-lg leading-relaxed">
                 To develop professionals by inculcating discipline, integrity, and ethical values.
-              </span>
+              </p>
             </li>
           </ul>
         </div>
@@ -158,6 +162,9 @@ const Home: React.FC = () => {
     </div>
   </div>
 </section>
+
+
+
 
 
       {/* Content below hero */}
