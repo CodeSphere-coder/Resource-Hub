@@ -219,15 +219,34 @@ const ResourceList: React.FC<Props> = ({ className, showFilters = true, allowDel
                 </td>
                 <td className="px-4 py-2 space-x-2 text-right">
                   {/* Open/download button */}
-                  <a
-                    href={(r as any).url || (r as any).fileUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                  >
-                    <Download className="h-4 w-4 mr-1" />
-                    Open
-                  </a>
+                  {(() => {
+                    const directUrl = (r as any).url || (r as any).fileUrl;
+                    const isPdf = (r.fileType || '').toLowerCase().includes('pdf') || (r.fileName || '').toLowerCase().endsWith('.pdf');
+                    const openUrl = directUrl;
+                    return (
+                      <>
+                        <a
+                          href={openUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                        >
+                          <Download className="h-4 w-4 mr-1" />
+                          Open
+                        </a>
+                        {isPdf && (
+                          <a
+                            href={`https://mozilla.github.io/pdf.js/web/viewer.html?file=${encodeURIComponent(directUrl)}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center px-3 py-1.5 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50"
+                          >
+                            View (PDF.js)
+                          </a>
+                        )}
+                      </>
+                    );
+                  })()}
                   <button
                     type="button"
                     onClick={() => navigator.clipboard.writeText(((r as any).url || (r as any).fileUrl || ''))}

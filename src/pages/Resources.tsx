@@ -1,8 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Search, Filter, FileText, Code, Calculator, BookOpen } from 'lucide-react';
+import { Search, Filter, FileText, Code, Calculator, BookOpen, Trash2 } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
-import { collection, getDocs, orderBy, query } from 'firebase/firestore';
-import { db } from '../config/firebase';
+import { collection, getDocs, query, deleteDoc, doc } from 'firebase/firestore';
+import { db, auth } from '../config/firebase';
+import { getUserRole } from '../utils/getUserRole';
+import { deleteFromCloudinaryByToken } from '../utils/cloudinary';
 
 const Resources: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -13,6 +15,8 @@ const Resources: React.FC = () => {
     { icon: <Calculator className="h-6 w-6" />, name: 'Previous Papers', count: 45, color: 'bg-purple-100 text-purple-600' },
     { icon: <BookOpen className="h-6 w-6" />, name: 'Books', count: 32, color: 'bg-orange-100 text-orange-600' },
   ];
+
+  type Role = 'admin' | 'teacher' | 'student';
 
   type Resource = {
     id: string;
@@ -27,13 +31,44 @@ const Resources: React.FC = () => {
     fileType: string;
     downloads?: number;
     uploadedAt?: any; // Firestore Timestamp or Date
+    uploadedBy?: string | null;
+    deleteToken?: string | null;
   };
   const [items, setItems] = useState<Resource[]>([]);
   const [loading, setLoading] = useState(false);
+  const [role, setRole] = useState<Role | null>(null);
+  const user = auth.currentUser;
 
   const location = useLocation();
   const params = new URLSearchParams(location.search);
   const term = params.get('term'); // 'odd' | 'even' | null
+
+  useEffect(() => {
+    let mounted = true;
+    const loadRole = async () => {
+      if (!user?.uid) {
+        setRole(null);
+        return;
+      }
+      try {
+        const r = await getUserRole(user.uid);
+        if (!mounted) return;
+        setRole((r as Role) || null);
+      } catch {
+        if (!mounted) return;
+        setRole(null);
+      }
+    };
+    loadRole();
+    return () => { mounted = false; };
+  }, [user?.uid]);
+
+  const canDelete = React.useCallback((r: Resource): boolean => {
+    if (!role) return false;
+    if (role === 'admin') return true;
+    if (role === 'teacher') return (r.uploadedBy && user?.uid) ? r.uploadedBy === user.uid : false;
+    return false;
+  }, [role, user?.uid]);
 
   useEffect(() => {
     const load = async () => {
@@ -56,6 +91,8 @@ const Resources: React.FC = () => {
             fileType: data.fileType || data.format || 'file',
             downloads: data.downloads || 0,
             uploadedAt: data.uploadedAt || data.timestamp || null,
+            uploadedBy: data.uploadedBy || data.teacherId || null,
+            deleteToken: data.deleteToken || null,
           };
           return normalized;
         });
@@ -74,6 +111,26 @@ const Resources: React.FC = () => {
     };
     load();
   }, []);
+
+  const handleDelete = React.useCallback(async (r: Resource) => {
+    if (!canDelete(r)) return;
+    const confirmed = window.confirm(`Delete resource "${r.fileName}"?`);
+    if (!confirmed) return;
+    try {
+      if (r.deleteToken) {
+        try {
+          await deleteFromCloudinaryByToken(r.deleteToken);
+        } catch {
+          // best effort
+        }
+      }
+      await deleteDoc(doc(db, 'resources', r.id));
+      setItems((prev) => prev.filter((x) => x.id !== r.id));
+    } catch (e) {
+      console.error(e);
+      alert('Failed to delete. Please try again.');
+    }
+  }, [canDelete]);
 
   const filtered = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -189,7 +246,37 @@ const Resources: React.FC = () => {
                 </div>
                 <div className="flex items-center justify-between mt-4">
                   <div className="text-sm text-gray-500">{resource.downloads || 0} downloads</div>
-                  <a href={resource.fileUrl} target="_blank" rel="noreferrer" className="px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">Open</a>
+                  <div className="flex items-center gap-2">
+                    {(() => {
+                      const isPdf = (resource.fileType || '').toLowerCase().includes('pdf') || (resource.fileName || '').toLowerCase().endsWith('.pdf');
+                      const directUrl = resource.fileUrl;
+                      return (
+                        <div className="flex items-center gap-2">
+                          <a href={directUrl} target="_blank" rel="noreferrer" className="px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">Open</a>
+                          {isPdf && (
+                            <a
+                              href={`https://mozilla.github.io/pdf.js/web/viewer.html?file=${encodeURIComponent(directUrl)}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                            >
+                              View (PDF.js)
+                            </a>
+                          )}
+                        </div>
+                      );
+                    })()}
+                    {canDelete(resource) && (
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(resource)}
+                        className="inline-flex items-center px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                      >
+                        <Trash2 className="h-4 w-4 mr-1" />
+                        Delete
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
