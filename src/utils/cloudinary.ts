@@ -9,10 +9,13 @@ export type CloudinaryUploadResult = {
   resourceType?: string;
   originalFilename?: string;
   format?: string;
+  publicId?: string;
 };
 
 export async function uploadToCloudinary(file: File, onProgress?: (progress: number) => void): Promise<CloudinaryUploadResult> {
-  const endpoint = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/auto/upload`;
+  // Use image endpoint only for real images; otherwise use raw to preserve original files (e.g., PDFs)
+  const isImage = file.type?.startsWith('image/');
+  const endpoint = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/${isImage ? 'image' : 'raw'}/upload`;
   const formData = new FormData();
   formData.append('file', file);
   formData.append('upload_preset', UPLOAD_PRESET);
@@ -27,12 +30,23 @@ export async function uploadToCloudinary(file: File, onProgress?: (progress: num
   });
 
   const data = response.data || {};
+  // Helpful debug logging
+  // eslint-disable-next-line no-console
+  console.log('[Cloudinary] Upload response:', {
+    secure_url: data.secure_url,
+    url: data.url,
+    resource_type: data.resource_type,
+    format: data.format,
+    original_filename: data.original_filename,
+    public_id: data.public_id,
+  });
   return {
     url: data.secure_url || data.url,
     deleteToken: data.delete_token,
     resourceType: data.resource_type,
     originalFilename: data.original_filename,
     format: data.format,
+    publicId: data.public_id,
   };
 }
 

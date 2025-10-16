@@ -45,6 +45,7 @@ const AdminUpload: React.FC = () => {
   const [file, setFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitMessage, setSubmitMessage] = useState<string | null>(null);
+  const [uploadedUrl, setUploadedUrl] = useState<string | null>(null);
 
   const allowedMimeTypes = [
     'application/pdf',
@@ -86,22 +87,23 @@ const AdminUpload: React.FC = () => {
     try {
       setIsSubmitting(true);
       const result = await uploadToCloudinary(file);
+      // eslint-disable-next-line no-console
+      console.log('[AdminUpload] Uploaded file result:', result);
+      setUploadedUrl(result.url || null);
 
-      // Save metadata in Firestore (Cloudinary)
+      // Save metadata in Firestore (standardized with ResourceList expectations)
       await addDoc(collection(db, 'resources'), {
-        teacherId: userProfile.uid,
-        teacherName: `Admin - ${userProfile.username}`,
+        uploadedBy: userProfile.uid,
+        role: 'admin',
+        fileName: file.name,
+        url: result.url,
+        deleteToken: result.deleteToken || null,
+        fileType: file.type,
         semester: Number(semester),
         subject,
         academicYear,
         term,
-        fileUrl: result.url,
-        deleteToken: result.deleteToken || null,
-        fileName: file.name,
-        fileType: file.type,
-        downloads: 0,
-        uploadedAt: serverTimestamp(),
-        uploadedBy: 'admin',
+        timestamp: serverTimestamp(),
       });
 
       setSubmitMessage('Resource uploaded successfully.');
@@ -298,6 +300,29 @@ const AdminUpload: React.FC = () => {
             </div>
           </form>
         </div>
+
+        {uploadedUrl && (
+          <div className="mt-6 bg-green-50 border border-green-200 rounded-lg p-4">
+            <p className="text-sm text-green-800 mb-2">Uploaded URL (test in new tab):</p>
+            <div className="flex items-center gap-2">
+              <a
+                href={uploadedUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="text-green-700 underline break-all"
+              >
+                {uploadedUrl}
+              </a>
+              <button
+                type="button"
+                onClick={() => { navigator.clipboard.writeText(uploadedUrl); }}
+                className="px-2 py-1 text-xs bg-green-600 text-white rounded"
+              >
+                Copy
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Upload Guidelines */}
         <div className="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-6">

@@ -16,17 +16,17 @@ const Resources: React.FC = () => {
 
   type Resource = {
     id: string;
-    teacherId: string;
-    teacherName: string;
+    teacherId?: string;
+    teacherName?: string;
     semester: number;
     subject: string;
     academicYear: string;
     term: 'odd' | 'even';
-    fileUrl: string;
-    filePath: string;
+    fileUrl: string; // normalized from fileUrl or url
     fileName: string;
     fileType: string;
     downloads?: number;
+    uploadedAt?: any; // Firestore Timestamp or Date
   };
   const [items, setItems] = useState<Resource[]>([]);
   const [loading, setLoading] = useState(false);
@@ -39,9 +39,34 @@ const Resources: React.FC = () => {
     const load = async () => {
       try {
         setLoading(true);
-        const q = query(collection(db, 'resources'), orderBy('uploadedAt', 'desc'));
-        const snap = await getDocs(q);
-        const list: Resource[] = snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) }));
+        // Fetch without requiring a specific order, then normalize and sort client-side
+        const snap = await getDocs(query(collection(db, 'resources')));
+        const list: Resource[] = snap.docs.map((d) => {
+          const data: any = d.data();
+          const normalized: Resource = {
+            id: d.id,
+            teacherId: data.teacherId,
+            teacherName: data.teacherName || (data.role === 'admin' ? 'Admin' : data.teacherName),
+            semester: Number(data.semester) || 0,
+            subject: data.subject || '',
+            academicYear: data.academicYear || '',
+            term: data.term as 'odd' | 'even',
+            fileUrl: data.fileUrl || data.url, // support Cloudinary and Firebase Storage
+            fileName: data.fileName || data.originalFilename || 'Untitled',
+            fileType: data.fileType || data.format || 'file',
+            downloads: data.downloads || 0,
+            uploadedAt: data.uploadedAt || data.timestamp || null,
+          };
+          return normalized;
+        });
+        // Sort by uploadedAt/timestamp desc
+        list.sort((a, b) => {
+          const at = a.uploadedAt;
+          const bt = b.uploadedAt;
+          const aMs = at?.seconds ? at.seconds * 1000 : (at instanceof Date ? at.getTime() : 0);
+          const bMs = bt?.seconds ? bt.seconds * 1000 : (bt instanceof Date ? bt.getTime() : 0);
+          return bMs - aMs;
+        });
         setItems(list);
       } finally {
         setLoading(false);
@@ -160,7 +185,7 @@ const Resources: React.FC = () => {
                     {resource.subject}
                   </span>
                   <span className="text-gray-400">•</span>
-                  <span>By {resource.teacherName}</span>
+                  <span>By {resource.teacherName || 'Unknown'}</span>
                 </div>
                 <div className="flex items-center justify-between mt-4">
                   <div className="text-sm text-gray-500">{resource.downloads || 0} downloads</div>

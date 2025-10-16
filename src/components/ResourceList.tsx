@@ -218,8 +218,9 @@ const ResourceList: React.FC<Props> = ({ className, showFilters = true, allowDel
                     : (r.timestamp instanceof Date ? r.timestamp.toLocaleString() : '-')}
                 </td>
                 <td className="px-4 py-2 space-x-2 text-right">
+                  {/* Open/download button */}
                   <a
-                    href={r.url}
+                    href={(r as any).url || (r as any).fileUrl}
                     target="_blank"
                     rel="noreferrer"
                     className="inline-flex items-center px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700"
@@ -227,6 +228,13 @@ const ResourceList: React.FC<Props> = ({ className, showFilters = true, allowDel
                     <Download className="h-4 w-4 mr-1" />
                     Open
                   </a>
+                  <button
+                    type="button"
+                    onClick={() => navigator.clipboard.writeText(((r as any).url || (r as any).fileUrl || ''))}
+                    className="inline-flex items-center px-3 py-1.5 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50"
+                  >
+                    Copy URL
+                  </button>
                   {canDelete(r) && (
                     <button
                       onClick={() => handleDelete(r)}
