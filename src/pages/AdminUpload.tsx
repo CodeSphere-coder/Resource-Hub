@@ -2,9 +2,9 @@ import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { Upload, ArrowLeft, FileText, BookOpen, Calendar, Award } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
-import { storage, db } from '../config/firebase';
+import { db } from '../config/firebase';
+import { uploadToCloudinary } from '../utils/cloudinary';
 
 const AdminUpload: React.FC = () => {
   const { userProfile } = useAuth();
@@ -85,17 +85,9 @@ const AdminUpload: React.FC = () => {
 
     try {
       setIsSubmitting(true);
-      // Create a unique storage path
-      const timestamp = Date.now();
-      const safeName = file.name.replace(/\s+/g, '_');
-      const storagePath = `resources/admin/${timestamp}_${safeName}`;
-      const storageRef = ref(storage, storagePath);
+      const result = await uploadToCloudinary(file);
 
-      // Upload to Firebase Storage
-      await uploadBytes(storageRef, file, { contentType: file.type });
-      const downloadURL = await getDownloadURL(storageRef);
-
-      // Save metadata in Firestore
+      // Save metadata in Firestore (Cloudinary)
       await addDoc(collection(db, 'resources'), {
         teacherId: userProfile.uid,
         teacherName: `Admin - ${userProfile.username}`,
@@ -103,8 +95,8 @@ const AdminUpload: React.FC = () => {
         subject,
         academicYear,
         term,
-        fileUrl: downloadURL,
-        filePath: storagePath,
+        fileUrl: result.url,
+        deleteToken: result.deleteToken || null,
         fileName: file.name,
         fileType: file.type,
         downloads: 0,

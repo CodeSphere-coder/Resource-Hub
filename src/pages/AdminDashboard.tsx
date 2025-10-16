@@ -3,9 +3,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { Users, Shield, FileText, TrendingUp, AlertTriangle, CheckCircle, Activity, Upload } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { collection, deleteDoc, doc, getDocs, orderBy, query, updateDoc, where } from 'firebase/firestore';
-import { deleteObject, ref as storageRef } from 'firebase/storage';
-import { storage } from '../config/firebase';
 import { db } from '../config/firebase';
+import { deleteFromCloudinaryByToken } from '../utils/cloudinary';
 
 const AdminDashboard: React.FC = () => {
   const { userProfile } = useAuth();
@@ -129,14 +128,14 @@ const AdminDashboard: React.FC = () => {
     await deleteDoc(doc(db, 'users', u.uid));
     setUsers((prev) => prev.filter((x) => x.uid !== u.uid));
 
-    // Also delete this user's resources and storage files
+    // Also delete this user's resources and Cloudinary files
     const resQ = query(collection(db, 'resources'), where('teacherId', '==', u.uid));
     const resSnap = await getDocs(resQ);
     const deletions: Promise<any>[] = [];
     resSnap.forEach((d) => {
       const data = d.data() as any;
-      if (data.filePath) {
-        deletions.push(deleteObject(storageRef(storage, data.filePath)).catch(() => {}));
+      if (data.deleteToken) {
+        deletions.push(deleteFromCloudinaryByToken(data.deleteToken).catch(() => {}));
       }
       deletions.push(deleteDoc(doc(db, 'resources', d.id)));
     });
@@ -144,9 +143,9 @@ const AdminDashboard: React.FC = () => {
   };
   const deleteResource = async (r: Resource) => {
     if (!window.confirm(`Delete resource "${r.fileName}"?`)) return;
-    // Delete storage file first (best-effort)
-    if (r.filePath) {
-      try { await deleteObject(storageRef(storage, r.filePath)); } catch (_) {}
+    // Delete Cloudinary asset first (best-effort)
+    if ((r as any).deleteToken) {
+      try { await deleteFromCloudinaryByToken((r as any).deleteToken); } catch (_) {}
     }
     await deleteDoc(doc(db, 'resources', r.id));
     setResources((prev) => prev.filter((x) => x.id !== r.id));
