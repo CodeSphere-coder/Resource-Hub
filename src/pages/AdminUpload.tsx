@@ -215,7 +215,7 @@ const AdminUpload: React.FC = () => {
                 <input
                   type="text"
                   className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  placeholder="e.g., 2024-25"
+                  placeholder="e.g., 2025-26"
                   value={academicYear}
                   onChange={(e) => setAcademicYear(e.target.value)}
                   required
