@@ -15,6 +15,7 @@ type Props = {
 const CloudinaryUpload: React.FC<Props> = ({ className }) => {
   const [semester, setSemester] = useState<number | ''>('');
   const [subject, setSubject] = useState('');
+  const [subjectCode, setSubjectCode] = useState('');
   const [academicYear, setAcademicYear] = useState('');
   const [term, setTerm] = useState<Term | ''>('');
   const [file, setFile] = useState<File | null>(null);
@@ -52,6 +53,7 @@ const CloudinaryUpload: React.FC<Props> = ({ className }) => {
   const resetForm = useCallback(() => {
     setSemester('');
     setSubject('');
+    setSubjectCode('');
     setAcademicYear('');
     setTerm('');
     setFile(null);
@@ -69,7 +71,7 @@ const CloudinaryUpload: React.FC<Props> = ({ className }) => {
       setMessage('You do not have permission to upload.');
       return;
     }
-    if (!semester || !subject || !academicYear || !term) {
+    if (!semester || !subject || !subjectCode.trim() || !academicYear || !term) {
       setMessage('Please fill in all fields.');
       return;
     }
@@ -91,6 +93,7 @@ const CloudinaryUpload: React.FC<Props> = ({ className }) => {
         deleteToken: uploadResult.deleteToken || null,
         semester: Number(semester),
         subject,
+        subjectCode: subjectCode.trim(),
         academicYear,
         term,
         fileType: file.type,
@@ -150,6 +153,17 @@ const CloudinaryUpload: React.FC<Props> = ({ className }) => {
                 value={subject}
                 onChange={(e) => setSubject(e.target.value)}
                 placeholder="e.g., Data Structures"
+                disabled={!canUpload}
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm text-gray-700 mb-1">Subject Code</label>
+              <input
+                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                value={subjectCode}
+                onChange={(e) => setSubjectCode(e.target.value)}
+                placeholder="e.g., CS301, CS-ML101"
                 disabled={!canUpload}
                 required
               />

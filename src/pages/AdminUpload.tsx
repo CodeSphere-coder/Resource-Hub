@@ -42,6 +42,7 @@ const AdminUpload: React.FC = () => {
   const [subject, setSubject] = useState('');
   const [academicYear, setAcademicYear] = useState('');
   const [term, setTerm] = useState<'odd' | 'even' | ''>('');
+  const [subjectCode, setSubjectCode] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitMessage, setSubmitMessage] = useState<string | null>(null);
@@ -64,6 +65,7 @@ const AdminUpload: React.FC = () => {
     setAcademicYear('');
     setTerm('');
     setFile(null);
+    setSubjectCode('');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -71,7 +73,7 @@ const AdminUpload: React.FC = () => {
     setSubmitMessage(null);
 
     if (!userProfile || userProfile.role !== 'admin') return;
-    if (!semester || !subject || !academicYear || !term) {
+    if (!semester || !subject || !subjectCode.trim() || !academicYear || !term) {
       setSubmitMessage('Please fill in all fields.');
       return;
     }
@@ -101,6 +103,7 @@ const AdminUpload: React.FC = () => {
         fileType: file.type,
         semester: Number(semester),
         subject,
+        subjectCode: subjectCode.trim(),
         academicYear,
         term,
         timestamp: serverTimestamp(),
@@ -174,6 +177,21 @@ const AdminUpload: React.FC = () => {
                 </select>
               </div>
               
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <FileText className="h-4 w-4 inline mr-1" />
+                  Subject Code
+                </label>
+                <input
+                  type="text"
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  placeholder="e.g., CS301, CS-ML101"
+                  value={subjectCode}
+                  onChange={(e) => setSubjectCode(e.target.value)}
+                  required
+                />
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   <FileText className="h-4 w-4 inline mr-1" />

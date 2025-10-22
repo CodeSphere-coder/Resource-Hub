@@ -25,6 +25,7 @@ const TeacherDashboard: React.FC = () => {
   // Upload form state
   const [semester, setSemester] = useState<number | ''>('');
   const [subject, setSubject] = useState('');
+  const [subjectCode, setSubjectCode] = useState('');
   const [academicYear, setAcademicYear] = useState('');
   const [term, setTerm] = useState<'odd' | 'even' | ''>('');
   const [file, setFile] = useState<File | null>(null);
@@ -45,6 +46,7 @@ const TeacherDashboard: React.FC = () => {
   const resetForm = () => {
     setSemester('');
     setSubject('');
+    setSubjectCode('');
     setAcademicYear('');
     setTerm('');
     setFile(null);
@@ -55,7 +57,7 @@ const TeacherDashboard: React.FC = () => {
     setSubmitMessage(null);
 
     if (!userProfile || userProfile.role !== 'teacher') return;
-    if (!semester || !subject || !academicYear || !term) {
+    if (!semester || !subject || !subjectCode.trim() || !academicYear || !term) {
       setSubmitMessage('Please fill in all fields.');
       return;
     }
@@ -78,6 +80,7 @@ const TeacherDashboard: React.FC = () => {
         teacherName: userProfile.username,
         semester: Number(semester),
         subject,
+        subjectCode: subjectCode.trim(),
         academicYear,
         term,
         fileUrl: result.url,
@@ -225,6 +228,17 @@ const TeacherDashboard: React.FC = () => {
                       />
                     )}
                   </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Subject Code</label>
+                  <input
+                    type="text"
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+                    placeholder="e.g., CS301, CS-ML101"
+                    value={subjectCode}
+                    onChange={(e) => setSubjectCode(e.target.value)}
+                    required
+                  />
+                </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Academic Year</label>
                     <input

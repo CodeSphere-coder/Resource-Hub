@@ -217,53 +217,54 @@ const ResourceList: React.FC<Props> = ({ className, showFilters = true, allowDel
                     ? new Date((r as any).timestamp.seconds * 1000).toLocaleString()
                     : (r.timestamp instanceof Date ? r.timestamp.toLocaleString() : '-')}
                 </td>
-                <td className="px-4 py-2 space-x-2 text-right">
-                  {/* Open/download button */}
-                  {(() => {
-                    const directUrl = (r as any).url || (r as any).fileUrl;
-                    const isPdf = (r.fileType || '').toLowerCase().includes('pdf') || (r.fileName || '').toLowerCase().endsWith('.pdf');
-                    const openUrl = directUrl;
-                    return (
-                      <>
-                        <a
-                          href={openUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                        >
-                          <Download className="h-4 w-4 mr-1" />
-                          Open
-                        </a>
-                        {isPdf && (
-                          <a
-                            href={`https://mozilla.github.io/pdf.js/web/viewer.html?file=${encodeURIComponent(directUrl)}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex items-center px-3 py-1.5 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50"
-                          >
-                            View (PDF.js)
-                          </a>
-                        )}
-                      </>
-                    );
-                  })()}
-                  <button
-                    type="button"
-                    onClick={() => navigator.clipboard.writeText(((r as any).url || (r as any).fileUrl || ''))}
-                    className="inline-flex items-center px-3 py-1.5 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50"
-                  >
-                    Copy URL
-                  </button>
-                  {canDelete(r) && (
-                    <button
-                      onClick={() => handleDelete(r)}
-                      className="inline-flex items-center px-3 py-1.5 bg-red-600 text-white rounded-md hover:bg-red-700"
-                    >
-                      <Trash2 className="h-4 w-4 mr-1" />
-                      Delete
-                    </button>
-                  )}
-                </td>
+                <td className="px-4 py-2">
+  <div className="flex flex-col md:flex-row flex-wrap gap-2 justify-end items-center">
+    {/* Open button */}
+    <a
+      href={(r as any).url || (r as any).fileUrl}
+      target="_blank"
+      rel="noreferrer"
+      className="inline-flex items-center gap-2 px-3 py-2 bg-blue-500 text-white text-sm font-semibold rounded-lg shadow hover:bg-blue-600 transition-all duration-200"
+    >
+      <Download className="w-4 h-4" />
+      Open
+    </a>
+
+    {/* View PDF.js button */}
+    {((r.fileType || '').toLowerCase().includes('pdf') || (r.fileName || '').toLowerCase().endsWith('.pdf')) && (
+      <a
+        href={`https://mozilla.github.io/pdf.js/web/viewer.html?file=${encodeURIComponent((r as any).url || (r as any).fileUrl)}`}
+        target="_blank"
+        rel="noreferrer"
+        className="inline-flex items-center gap-2 px-3 py-2 border border-gray-300 text-gray-700 bg-white text-sm font-semibold rounded-lg shadow-sm hover:bg-gray-100 transition-all duration-200"
+      >
+        View PDF
+      </a>
+    )}
+
+    {/* Copy URL */}
+    <button
+      type="button"
+      onClick={() => navigator.clipboard.writeText((r as any).url || (r as any).fileUrl || '')}
+      className="inline-flex items-center gap-2 px-3 py-2 border border-gray-300 text-gray-700 bg-white text-sm font-semibold rounded-lg shadow-sm hover:bg-gray-100 transition-all duration-200"
+    >
+      Copy URL
+    </button>
+
+    {/* Delete button (if allowed) */}
+    {canDelete(r) && (
+      <button
+        onClick={() => handleDelete(r)}
+        className="inline-flex items-center gap-2 px-3 py-2 bg-red-500 text-white text-sm font-semibold rounded-lg shadow hover:bg-red-600 transition-all duration-200"
+      >
+        <Trash2 className="w-4 h-4" />
+        Delete
+      </button>
+    )}
+  </div>
+</td>
+
+
               </tr>
             ))}
           </tbody>

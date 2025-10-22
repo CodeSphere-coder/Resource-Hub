@@ -8,7 +8,8 @@ import { deleteFromCloudinaryByToken } from '../utils/cloudinary';
 
 const Resources: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
-
+  const [selectedSemester, setSelectedSemester] = useState<number | null>(null); // 🆕
+  
   const categories = [
     { icon: <FileText className="h-6 w-6" />, name: 'Notes', count: 150, color: 'bg-blue-100 text-blue-600' },
     { icon: <Code className="h-6 w-6" />, name: 'Code', count: 89, color: 'bg-green-100 text-green-600' },
@@ -24,24 +25,25 @@ const Resources: React.FC = () => {
     teacherName?: string;
     semester: number;
     subject: string;
+    subjectCode?: string;
     academicYear: string;
     term: 'odd' | 'even';
-    fileUrl: string; // normalized from fileUrl or url
+    fileUrl: string;
     fileName: string;
     fileType: string;
     downloads?: number;
-    uploadedAt?: any; // Firestore Timestamp or Date
+    uploadedAt?: any;
     uploadedBy?: string | null;
     deleteToken?: string | null;
   };
+
   const [items, setItems] = useState<Resource[]>([]);
   const [loading, setLoading] = useState(false);
   const [role, setRole] = useState<Role | null>(null);
   const user = auth.currentUser;
-
   const location = useLocation();
   const params = new URLSearchParams(location.search);
-  const term = params.get('term'); // 'odd' | 'even' | null
+  const term = params.get('term');
 
   useEffect(() => {
     let mounted = true;
@@ -74,7 +76,6 @@ const Resources: React.FC = () => {
     const load = async () => {
       try {
         setLoading(true);
-        // Fetch without requiring a specific order, then normalize and sort client-side
         const snap = await getDocs(query(collection(db, 'resources')));
         const list: Resource[] = snap.docs.map((d) => {
           const data: any = d.data();
@@ -84,9 +85,10 @@ const Resources: React.FC = () => {
             teacherName: data.teacherName || (data.role === 'admin' ? 'Admin' : data.teacherName),
             semester: Number(data.semester) || 0,
             subject: data.subject || '',
+            subjectCode: data.subjectCode || '',
             academicYear: data.academicYear || '',
             term: data.term as 'odd' | 'even',
-            fileUrl: data.fileUrl || data.url, // support Cloudinary and Firebase Storage
+            fileUrl: data.fileUrl || data.url,
             fileName: data.fileName || data.originalFilename || 'Untitled',
             fileType: data.fileType || data.format || 'file',
             downloads: data.downloads || 0,
@@ -96,12 +98,9 @@ const Resources: React.FC = () => {
           };
           return normalized;
         });
-        // Sort by uploadedAt/timestamp desc
         list.sort((a, b) => {
-          const at = a.uploadedAt;
-          const bt = b.uploadedAt;
-          const aMs = at?.seconds ? at.seconds * 1000 : (at instanceof Date ? at.getTime() : 0);
-          const bMs = bt?.seconds ? bt.seconds * 1000 : (bt instanceof Date ? bt.getTime() : 0);
+          const aMs = a.uploadedAt?.seconds ? a.uploadedAt.seconds * 1000 : (a.uploadedAt instanceof Date ? a.uploadedAt.getTime() : 0);
+          const bMs = b.uploadedAt?.seconds ? b.uploadedAt.seconds * 1000 : (b.uploadedAt instanceof Date ? b.uploadedAt.getTime() : 0);
           return bMs - aMs;
         });
         setItems(list);
@@ -137,14 +136,14 @@ const Resources: React.FC = () => {
     return items.filter((r) => {
       const matchesTerm = term ? (term === 'odd' ? r.semester % 2 === 1 : r.semester % 2 === 0) : true;
       const matchesQuery = q ? (r.fileName.toLowerCase().includes(q) || r.subject.toLowerCase().includes(q)) : true;
-      return matchesTerm && matchesQuery;
+      const matchesSemester = selectedSemester ? r.semester === selectedSemester : true; // 🆕
+      return matchesTerm && matchesQuery && matchesSemester;
     });
-  }, [items, searchQuery, term]);
+  }, [items, searchQuery, term, selectedSemester]); // 🆕 added selectedSemester
 
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-4">Browse Resources</h1>
           <p className="text-gray-600">Discover and download resources shared by CSE students</p>
@@ -164,13 +163,22 @@ const Resources: React.FC = () => {
               />
             </div>
             <div className="flex gap-2">
-              <select className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <option>All Semesters</option>
-                <option>Semester 1</option>
-                <option>Semester 2</option>
-                <option>Semester 3</option>
-                <option>Semester 4</option>
+              {/* 🆕 Semester Dropdown */}
+              <select
+                value={selectedSemester ?? ''}
+                onChange={(e) => {
+                  const val = Number(e.target.value);
+                  setSelectedSemester(isNaN(val) ? null : val);
+                }}
+                className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">All Semesters</option>
+                {[...Array(8)].map((_, i) => (
+                  <option key={i} value={i + 1}>Semester {i + 1}</option>
+                ))}
               </select>
+
+              {/* Placeholder type filter (optional implementation) */}
               <select className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
                 <option>All Types</option>
                 <option>Notes</option>
@@ -178,12 +186,14 @@ const Resources: React.FC = () => {
                 <option>Previous Papers</option>
                 <option>Books</option>
               </select>
+
               <button className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
                 <Filter className="h-4 w-4 mr-2" />
                 Filter
               </button>
             </div>
           </div>
+
           {/* Quick Odd/Even chips */}
           <div className="mt-4 flex items-center gap-2 text-sm">
             <Link
@@ -232,7 +242,7 @@ const Resources: React.FC = () => {
             <div key={resource.id} className="group bg-white rounded-xl shadow-md p-6 hover:shadow-xl transition-all duration-200 hover:-translate-y-0.5">
               <div className="flex-1">
                 <div className="flex items-center justify-between mb-3">
-                  <span className="px-2 py-1 bg-gray-100 text-gray-700 rounded-full text-xs">{resource.fileType?.split('/')[1]?.toUpperCase() || 'FILE'}</span>
+                  <span className="px-2 py-1 bg-gray-100 text-gray-700 rounded-full text-xs">{(resource.subjectCode || '').toUpperCase() || 'NO CODE'}</span>
                   <span className="text-xs text-gray-500">Sem {resource.semester}</span>
                 </div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-2 group-hover:text-blue-600 transition-colors">{resource.fileName}</h3>
@@ -241,10 +251,23 @@ const Resources: React.FC = () => {
                     <span className="w-2 h-2 bg-blue-500 rounded-full mr-2"></span>
                     {resource.subject}
                   </span>
+                  {resource.subjectCode && (
+                    <>
+                      <span className="text-gray-400">•</span>
+                      <span className="font-mono text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded">{resource.subjectCode}</span>
+                    </>
+                  )}
                   <span className="text-gray-400">•</span>
                   <span>By {resource.teacherName || 'Unknown'}</span>
                 </div>
-                <div className="flex items-center justify-between mt-4">
+                <div className="text-xs text-gray-500 mb-1">
+                  {(() => {
+                    const t: any = resource.uploadedAt as any;
+                    const ms = t?.seconds ? t.seconds * 1000 : (t instanceof Date ? t.getTime() : 0);
+                    return ms ? new Date(ms).toLocaleString() : '';
+                  })()}
+                </div>
+                <div className="flex items-center justify-between mt-3">
                   <div className="text-sm text-gray-500">{resource.downloads || 0} downloads</div>
                   <div className="flex items-center gap-2">
                     {(() => {

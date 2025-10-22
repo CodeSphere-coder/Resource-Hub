@@ -10,6 +10,7 @@ import Signup from './pages/Signup';
 import StudentDashboard from './pages/StudentDashboard';
 import TeacherDashboard from './pages/TeacherDashboard';
 import AdminDashboard from './pages/AdminDashboard';
+import AdminUsers from './pages/AdminUsers';
 import AdminUpload from './pages/AdminUpload';
 import Resources from './pages/Resources';
 import Semesters from './pages/Semesters';
@@ -46,6 +47,14 @@ function App() {
                 element={
                   <ProtectedRoute requiredRole="admin" requireAdminEmail>
                     <AdminDashboard />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/admin/users" 
+                element={
+                  <ProtectedRoute requiredRole="admin" requireAdminEmail>
+                    <AdminUsers />
                   </ProtectedRoute>
                 } 
               />

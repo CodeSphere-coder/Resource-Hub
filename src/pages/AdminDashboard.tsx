@@ -250,64 +250,6 @@ const AdminDashboard: React.FC = () => {
               ))}
             </div>
 
-            {/* Users Management */}
-            <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-xl font-semibold text-gray-900">Users</h3>
-                {loadingUsers && <span className="text-sm text-gray-500">Loading...</span>}
-              </div>
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200 text-sm">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-3 py-2 text-left">Name</th>
-                      <th className="px-3 py-2 text-left">Email</th>
-                      <th className="px-3 py-2 text-left">Role</th>
-                      <th className="px-3 py-2 text-left">Semester/Subjects</th>
-                      <th className="px-3 py-2 text-right"></th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {users.map((u) => (
-                      <tr key={u.uid} className="hover:bg-gray-50">
-                        <td className="px-3 py-2 font-medium text-gray-900">{u.username}</td>
-                        <td className="px-3 py-2">{u.email}</td>
-                        <td className="px-3 py-2 capitalize">{u.role}</td>
-                        <td className="px-3 py-2">
-                          {u.role === 'student' ? (
-                            <span>Sem {u.semester ?? '-'}</span>
-                          ) : u.role === 'teacher' ? (
-                            <span>{(u.subjects || []).join(', ') || '-'}</span>
-                          ) : (
-                            '-'
-                          )}
-                        </td>
-                        <td className="px-3 py-2 text-right space-x-2">
-                          <button
-                            onClick={() => toggleBlockUser(u)}
-                            className={`px-3 py-1.5 rounded-md ${u.blocked ? 'bg-green-600 text-white' : 'bg-yellow-100 text-yellow-800'}`}
-                          >
-                            {u.blocked ? 'Unblock' : 'Block'}
-                          </button>
-                          <button
-                            onClick={() => deleteUser(u)}
-                            className="px-3 py-1.5 rounded-md bg-red-600 text-white"
-                          >
-                            Delete
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                    {users.length === 0 && (
-                      <tr>
-                        <td colSpan={5} className="px-3 py-6 text-center text-gray-500">No users found.</td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
             {/* Resources Management */}
             <div className="bg-white rounded-lg shadow-md p-6 mb-8">
               <div className="flex items-center justify-between mb-4">
