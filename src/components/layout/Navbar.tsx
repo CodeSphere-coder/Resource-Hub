@@ -61,13 +61,9 @@ const Navbar: React.FC = () => {
             <Link to="/" className="text-gray-700 hover:text-blue-600 transition-colors">Home</Link>
             
             <Link to="/resources" className="text-gray-700 hover:text-blue-600 transition-colors">Resources</Link>
-            {currentUser && (
-              <Link to="/upload" className="flex items-center space-x-1 text-gray-700 hover:text-blue-600 transition-colors">
-                <Upload className="h-4 w-4" />
-                <span>Upload</span>
-              </Link>
-            )}
-            {userProfile?.role === 'admin' && (
+            
+  
+          {userProfile?.role === 'admin' && (
               <Link to="/admin-dashboard" className="text-gray-700 hover:text-blue-600 transition-colors">Admin</Link>
             )}
           </div>
