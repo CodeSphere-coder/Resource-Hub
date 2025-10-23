@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { Users, Shield, FileText, TrendingUp, AlertTriangle, CheckCircle, Activity, Upload } from 'lucide-react';
+import { Users, Shield, FileText, AlertTriangle, CheckCircle, Activity, Upload } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { collection, deleteDoc, doc, getDocs, orderBy, query, updateDoc, where } from 'firebase/firestore';
 import { db } from '../config/firebase';
@@ -151,19 +151,18 @@ const AdminDashboard: React.FC = () => {
     setResources((prev) => prev.filter((x) => x.id !== r.id));
   };
 
+  // Calculate real-time stats
+  const totalUsers = users.length;
+  const totalResources = resources.length;
+
   const stats = [
-    { label: 'Total Users', value: '1,234', icon: <Users className="h-5 w-5" />, color: 'bg-blue-100 text-blue-600', change: '+12%' },
-    { label: 'Total Resources', value: '2,567', icon: <FileText className="h-5 w-5" />, color: 'bg-green-100 text-green-600', change: '+8%' },
-    { label: 'Pending Approvals', value: '23', icon: <AlertTriangle className="h-5 w-5" />, color: 'bg-yellow-100 text-yellow-600', change: '-5%' },
-    { label: 'System Health', value: '99.2%', icon: <Activity className="h-5 w-5" />, color: 'bg-purple-100 text-purple-600', change: '+0.1%' },
+    { label: 'Total Users', value: totalUsers.toLocaleString(), icon: <Users className="h-5 w-5" />, color: 'bg-blue-100 text-blue-600', change: '+12%' },
+    { label: 'Total Resources', value: totalResources.toLocaleString(), icon: <FileText className="h-5 w-5" />, color: 'bg-green-100 text-green-600', change: '+8%' },
   ];
 
   const quickActions = [
     { title: 'Upload Resources', description: 'Upload campus resources as admin', icon: <Upload className="h-6 w-6" />, href: '/admin/upload', color: 'bg-green-500' },
     { title: 'User Management', description: 'Manage users and permissions', icon: <Users className="h-6 w-6" />, href: '/admin/users', color: 'bg-blue-500' },
-    { title: 'Content Moderation', description: 'Review and approve content', icon: <Shield className="h-6 w-6" />, href: '/admin/moderation', color: 'bg-red-500' },
-    { title: 'System Analytics', description: 'View platform statistics', icon: <TrendingUp className="h-6 w-6" />, href: '/admin/analytics', color: 'bg-green-500' },
-    { title: 'System Settings', description: 'Configure platform settings', icon: <FileText className="h-6 w-6" />, href: '/admin/settings', color: 'bg-purple-500' },
   ];
 
   const recentActivity = [
@@ -180,17 +179,33 @@ const AdminDashboard: React.FC = () => {
     { type: 'Content Update', name: 'Database Systems Notes', uploader: 'Prof. Williams', priority: 'low' },
   ];
 
-  const userBreakdown = [
-    { role: 'Students', count: 1089, percentage: 88, color: 'bg-blue-500' },
-    { role: 'Teachers', count: 142, percentage: 11, color: 'bg-green-500' },
-    { role: 'Admins', count: 3, percentage: 1, color: 'bg-purple-500' },
-  ];
+  // Calculate real-time user distribution
+  const userBreakdown = useMemo(() => {
+    const students = users.filter(u => u.role === 'student').length;
+    const teachers = users.filter(u => u.role === 'teacher').length;
+    const admins = users.filter(u => u.role === 'admin').length;
+    const total = students + teachers + admins;
+    
+    if (total === 0) {
+      return [
+        { role: 'Students', count: 0, percentage: 0, color: 'bg-blue-500' },
+        { role: 'Teachers', count: 0, percentage: 0, color: 'bg-green-500' },
+        { role: 'Admins', count: 0, percentage: 0, color: 'bg-purple-500' },
+      ];
+    }
+    
+    return [
+      { role: 'Students', count: students, percentage: Math.round((students / total) * 100), color: 'bg-blue-500' },
+      { role: 'Teachers', count: teachers, percentage: Math.round((teachers / total) * 100), color: 'bg-green-500' },
+      { role: 'Admins', count: admins, percentage: Math.round((admins / total) * 100), color: 'bg-purple-500' },
+    ];
+  }, [users]);
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Welcome Header */}
-        <div className="bg-gradient-to-r from-purple-500 to-purple-600 rounded-2xl text-white p-8 mb-8">
+        <div className="bg-gradient-to-r from-purple-500 to-purple-600 rounded-xl text-white p-6 mb-6">
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-bold mb-2">Admin Dashboard 🛡️</h1>
@@ -210,9 +225,9 @@ const AdminDashboard: React.FC = () => {
         </div>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4 mb-6">
           {stats.map((stat, index) => (
-            <div key={index} className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
+            <div key={index} className="bg-white rounded-lg shadow-md p-4 hover:shadow-lg transition-shadow">
               <div className="flex items-center justify-between mb-2">
                 <div className={`p-3 rounded-full ${stat.color}`}>
                   {stat.icon}
@@ -230,34 +245,37 @@ const AdminDashboard: React.FC = () => {
           ))}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Quick Actions */}
           <div className="lg:col-span-2">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">Quick Actions</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            <h2 className="text-xl font-bold text-gray-900 mb-4">Quick Actions</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
               {quickActions.map((action, index) => (
                 <Link
                   key={index}
                   to={action.href}
-                  className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-all duration-200 group"
+                  className="bg-white rounded-lg shadow-md p-4 hover:shadow-lg transition-all duration-200 group"
                 >
-                  <div className={`${action.color} text-white w-12 h-12 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform`}>
+                  <div className={`${action.color} text-white w-10 h-10 rounded-lg flex items-center justify-center mb-3 group-hover:scale-110 transition-transform`}>
                     {action.icon}
                   </div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2 group-hover:text-purple-600 transition-colors">{action.title}</h3>
+                  <h3 className="text-base font-semibold text-gray-900 mb-1 group-hover:text-purple-600 transition-colors">{action.title}</h3>
                   <p className="text-gray-600 text-sm">{action.description}</p>
                 </Link>
               ))}
             </div>
 
+            {/* Users Management */}
+             
+
             {/* Resources Management */}
-            <div className="bg-white rounded-lg shadow-md p-6 mb-8">
+            <div className="bg-white rounded-lg shadow-md p-4 mb-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-xl font-semibold text-gray-900">Resources</h3>
                 {loadingResources && <span className="text-sm text-gray-500">Loading...</span>}
               </div>
               {groupedBySemSubject.map(([group, items]) => (
-                <div key={group} className="mb-6">
+                <div key={group} className="mb-4">
                   <div className="flex items-center justify-between">
                     <h4 className="font-semibold text-gray-900">{group}</h4>
                     <span className="text-xs text-gray-500">{items.length} item(s)</span>
@@ -308,7 +326,7 @@ const AdminDashboard: React.FC = () => {
               )}
             </div>
             {/* User Breakdown */}
-            <div className="bg-white rounded-lg shadow-md p-6 mb-8">
+            <div className="bg-white rounded-lg shadow-md p-4 mb-6">
               <h3 className="text-xl font-semibold text-gray-900 mb-4">User Distribution</h3>
               <div className="space-y-4">
                 {userBreakdown.map((user, index) => (
@@ -333,29 +351,13 @@ const AdminDashboard: React.FC = () => {
             </div>
 
             {/* Recent Activity */}
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h3 className="text-xl font-semibold text-gray-900 mb-4">Recent System Activity</h3>
-              <div className="space-y-4">
-                {recentActivity.map((activity, index) => (
-                  <div key={index} className="flex items-start space-x-3 p-3 bg-gray-50 rounded-lg">
-                    <div className={`p-2 rounded-full ${activity.color} flex-shrink-0`}>
-                      {activity.icon}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900">{activity.action}</p>
-                      <p className="text-sm text-gray-600">{activity.details}</p>
-                      <p className="text-xs text-gray-500 mt-1">{activity.time}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+             
           </div>
 
           {/* Sidebar */}
           <div className="space-y-6">
             {/* Analytics */}
-            <div className="bg-white rounded-lg shadow-md p-6">
+            <div className="bg-white rounded-lg shadow-md p-4">
               <h3 className="text-xl font-semibold text-gray-900 mb-4">Uploads per Semester</h3>
               <div className="grid grid-cols-4 gap-3 text-sm">
                 {uploadsPerSem.map((c, i) => (
@@ -367,83 +369,29 @@ const AdminDashboard: React.FC = () => {
               </div>
             </div>
 
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h3 className="text-xl font-semibold text-gray-900 mb-4">Uploads per Teacher</h3>
-              <div className="space-y-2 text-sm">
-                {uploadsPerTeacher.map(([name, count]) => (
-                  <div key={name} className="flex items-center justify-between">
-                    <span className="truncate max-w-[180px]">{name}</span>
-                    <span className="font-semibold">{count}</span>
-                  </div>
-                ))}
-                {uploadsPerTeacher.length === 0 && (
-                  <div className="text-gray-500 text-sm">No data</div>
-                )}
-              </div>
-            </div>
+            <div className="bg-white rounded-lg shadow-md p-4">
+  <h3 className="text-xl font-semibold text-gray-900 mb-4">Most Downloaded</h3>
+  <div className="space-y-3 text-sm">
+    {topDownloads.map((r) => (
+      <div key={r.id} className="flex items-center justify-between">
+        <span className="truncate max-w-[180px]">{r.fileName}</span>
+      </div>
+    ))}
+    {topDownloads.length === 0 && (
+      <div className="text-gray-500 text-sm">No data</div>
+    )}
+  </div>
+</div>
 
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h3 className="text-xl font-semibold text-gray-900 mb-4">Most Downloaded</h3>
-              <div className="space-y-3 text-sm">
-                {topDownloads.map((r) => (
-                  <div key={r.id} className="flex items-center justify-between">
-                    <span className="truncate max-w-[180px]">{r.fileName}</span>
-                    <span className="text-gray-600">{(r as any).downloads || 0}</span>
-                  </div>
-                ))}
-                {topDownloads.length === 0 && (
-                  <div className="text-gray-500 text-sm">No data</div>
-                )}
-              </div>
-            </div>
             {/* Pending Approvals */}
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-xl font-semibold text-gray-900">Pending Approvals</h3>
-                <span className="bg-red-100 text-red-800 px-2 py-1 rounded-full text-xs font-medium">
-                  {pendingApprovals.length}
-                </span>
-              </div>
-              <div className="space-y-3">
-                {pendingApprovals.map((approval, index) => (
-                  <div key={index} className="border-l-4 border-yellow-500 pl-4 py-2">
-                    <div className="flex items-center justify-between mb-1">
-                      <h4 className="font-medium text-gray-900 text-sm">{approval.type}</h4>
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        approval.priority === 'high' ? 'bg-red-100 text-red-800' :
-                        approval.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
-                        'bg-green-100 text-green-800'
-                      }`}>
-                        {approval.priority}
-                      </span>
-                    </div>
-                    <p className="text-sm text-gray-600">{approval.name}</p>
-                    {approval.uploader && (
-                      <p className="text-xs text-gray-500">by {approval.uploader}</p>
-                    )}
-                    {approval.subject && (
-                      <p className="text-xs text-gray-500">Subject: {approval.subject}</p>
-                    )}
-                    {approval.reporter && (
-                      <p className="text-xs text-gray-500">Reporter: {approval.reporter}</p>
-                    )}
-                  </div>
-                ))}
-              </div>
-              <Link
-                to="/admin/approvals"
-                className="block text-center mt-4 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm"
-              >
-                View All Approvals
-              </Link>
-            </div>
+ 
 
             {/* System Status */}
-            <div className="bg-white rounded-lg shadow-md p-6">
+            <div className="bg-white rounded-lg shadow-md p-4">
               <h3 className="text-xl font-semibold text-gray-900 mb-4">System Status</h3>
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">Database</span>
+                  <span className="text-sm text-gray-600">Firestore</span>
                   <div className="flex items-center">
                     <CheckCircle className="h-4 w-4 text-green-500 mr-1" />
                     <span className="text-sm text-green-600">Online</span>
@@ -464,35 +412,33 @@ const AdminDashboard: React.FC = () => {
                   </div>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">CDN</span>
+                  <span className="text-sm text-gray-600">Cloudinary</span>
                   <div className="flex items-center">
-                    <AlertTriangle className="h-4 w-4 text-yellow-500 mr-1" />
-                    <span className="text-sm text-yellow-600">Degraded</span>
+                    <CheckCircle className="h-4 w-4 text-green-500 mr-1" />
+                    <span className="text-sm text-green-600">Online</span>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Quick Stats */}
-            <div className="bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg p-6 text-white">
-              <h3 className="font-bold mb-3">Today's Summary</h3>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span>New Users:</span>
-                  <span className="font-semibold">12</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Resources Added:</span>
-                  <span className="font-semibold">8</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Reports Resolved:</span>
-                  <span className="font-semibold">5</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>System Uptime:</span>
-                  <span className="font-semibold">99.9%</span>
-                </div>
+            {/* Faculty Resource Count */}
+            <div className="bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg p-4 text-white">
+              <h3 className="font-bold mb-3">Faculty Resources</h3>
+              <div className="space-y-2 text-sm max-h-64 overflow-y-auto">
+                {uploadsPerTeacher.length > 0 ? (
+                  uploadsPerTeacher.map(([teacherName, count]) => (
+                    <div key={teacherName} className="flex justify-between items-center">
+                      <span className="truncate max-w-[140px]" title={teacherName}>{teacherName}</span>
+                      <span className="font-semibold bg-white/20 px-2 py-1 rounded-full text-xs">
+                        {count}
+                      </span>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center text-white/70 py-4">
+                    No faculty resources yet
+                  </div>
+                )}
               </div>
             </div>
           </div>

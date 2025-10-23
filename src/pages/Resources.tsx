@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Search, Filter, FileText, Code, Calculator, BookOpen, Trash2 } from 'lucide-react';
+import { Search, Filter, FileText, Code, Calculator, BookOpen, Trash2, Folder, ChevronDown, ChevronRight } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { collection, getDocs, query, deleteDoc, doc } from 'firebase/firestore';
 import { db, auth } from '../config/firebase';
@@ -8,7 +8,8 @@ import { deleteFromCloudinaryByToken } from '../utils/cloudinary';
 
 const Resources: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedSemester, setSelectedSemester] = useState<number | null>(null); // 🆕
+  const [selectedSemester, setSelectedSemester] = useState<number | null>(null);
+  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
   
   const categories = [
     { icon: <FileText className="h-6 w-6" />, name: 'Notes', count: 150, color: 'bg-blue-100 text-blue-600' },
@@ -72,6 +73,16 @@ const Resources: React.FC = () => {
     return false;
   }, [role, user?.uid]);
 
+  const toggleFolder = (subjectCode: string) => {
+    const newExpanded = new Set(expandedFolders);
+    if (newExpanded.has(subjectCode)) {
+      newExpanded.delete(subjectCode);
+    } else {
+      newExpanded.add(subjectCode);
+    }
+    setExpandedFolders(newExpanded);
+  };
+
   useEffect(() => {
     const load = async () => {
       try {
@@ -99,8 +110,12 @@ const Resources: React.FC = () => {
           return normalized;
         });
         list.sort((a, b) => {
-          const aMs = a.uploadedAt?.seconds ? a.uploadedAt.seconds * 1000 : (a.uploadedAt instanceof Date ? a.uploadedAt.getTime() : 0);
-          const bMs = b.uploadedAt?.seconds ? b.uploadedAt.seconds * 1000 : (b.uploadedAt instanceof Date ? b.uploadedAt.getTime() : 0);
+          const aMs = a.uploadedAt?.seconds !== undefined
+            ? a.uploadedAt.seconds * 1000
+            : (a.uploadedAt instanceof Date ? a.uploadedAt.getTime() : 0);
+          const bMs = b.uploadedAt?.seconds !== undefined
+            ? b.uploadedAt.seconds * 1000
+            : (b.uploadedAt instanceof Date ? b.uploadedAt.getTime() : 0);
           return bMs - aMs;
         });
         setItems(list);
@@ -136,10 +151,47 @@ const Resources: React.FC = () => {
     return items.filter((r) => {
       const matchesTerm = term ? (term === 'odd' ? r.semester % 2 === 1 : r.semester % 2 === 0) : true;
       const matchesQuery = q ? (r.fileName.toLowerCase().includes(q) || r.subject.toLowerCase().includes(q)) : true;
-      const matchesSemester = selectedSemester ? r.semester === selectedSemester : true; // 🆕
+      const matchesSemester = selectedSemester ? r.semester === selectedSemester : true;
       return matchesTerm && matchesQuery && matchesSemester;
     });
-  }, [items, searchQuery, term, selectedSemester]); // 🆕 added selectedSemester
+  }, [items, searchQuery, term, selectedSemester]);
+
+  const groupedResources = useMemo(() => {
+    const groups: { [key: string]: Resource[] } = {};
+    
+    filtered.forEach((resource) => {
+      const subjectCode = resource.subjectCode || 'NO_CODE';
+      if (!groups[subjectCode]) {
+        groups[subjectCode] = [];
+      }
+      groups[subjectCode].push(resource);
+    });
+
+    // Sort groups by subject code
+    const sortedGroups = Object.entries(groups).sort(([a], [b]) => a.localeCompare(b));
+    
+    return sortedGroups.map(([subjectCode, resources]) => ({
+      subjectCode,
+      resources: resources.sort((a, b) => {
+        const aMs = a.uploadedAt?.seconds !== undefined
+          ? a.uploadedAt.seconds * 1000
+          : (a.uploadedAt instanceof Date ? a.uploadedAt.getTime() : 0);
+        const bMs = b.uploadedAt?.seconds !== undefined
+          ? b.uploadedAt.seconds * 1000
+          : (b.uploadedAt instanceof Date ? b.uploadedAt.getTime() : 0);
+        return bMs - aMs;
+      })
+    }));
+  }, [filtered]);
+
+  // Auto-expand folders when resources change
+  useEffect(() => {
+    const newExpanded = new Set<string>();
+    groupedResources.forEach(group => {
+      newExpanded.add(group.subjectCode);
+    });
+    setExpandedFolders(newExpanded);
+  }, [groupedResources]);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -232,76 +284,209 @@ const Resources: React.FC = () => {
           ))}
         </div>
 
-        {/* Resources Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {/* Resources Summary */}
+        <div className="bg-white rounded-lg shadow-md p-4 mb-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900">Resources by Subject</h2>
+              <p className="text-sm text-gray-600">
+                {groupedResources.length} subject{groupedResources.length !== 1 ? 's' : ''} • {filtered.length} total resource{filtered.length !== 1 ? 's' : ''}
+              </p>
+            </div>
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={() => {
+                  const allExpanded = new Set(groupedResources.map(g => g.subjectCode));
+                  setExpandedFolders(allExpanded);
+                }}
+                className="px-3 py-1.5 text-sm bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200 transition-colors"
+              >
+                Expand All
+              </button>
+              <button
+                onClick={() => setExpandedFolders(new Set())}
+                className="px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors"
+              >
+                Collapse All
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Resources by Subject Code Folders */}
+        <div className="space-y-6">
           {loading ? (
-            <div className="col-span-full text-sm text-gray-500">Loading...</div>
-          ) : filtered.length === 0 ? (
-            <div className="col-span-full text-sm text-gray-500">No resources found.</div>
-          ) : filtered.map((resource) => (
-            <div key={resource.id} className="group bg-white rounded-xl shadow-md p-6 hover:shadow-xl transition-all duration-200 hover:-translate-y-0.5">
-              <div className="flex-1">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="px-2 py-1 bg-gray-100 text-gray-700 rounded-full text-xs">{(resource.subjectCode || '').toUpperCase() || 'NO CODE'}</span>
-                  <span className="text-xs text-gray-500">Sem {resource.semester}</span>
-                </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2 group-hover:text-blue-600 transition-colors">{resource.fileName}</h3>
-                <div className="flex items-center gap-3 text-sm text-gray-600 mb-3">
-                  <span className="flex items-center">
-                    <span className="w-2 h-2 bg-blue-500 rounded-full mr-2"></span>
-                    {resource.subject}
-                  </span>
-                  {resource.subjectCode && (
-                    <>
-                      <span className="text-gray-400">•</span>
-                      <span className="font-mono text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded">{resource.subjectCode}</span>
-                    </>
+            <div className="text-sm text-gray-500">Loading...</div>
+          ) : groupedResources.length === 0 ? (
+            <div className="text-sm text-gray-500">No resources found.</div>
+          ) : groupedResources.map((group) => (
+            <div key={group.subjectCode} className="bg-white rounded-lg shadow-md overflow-hidden">
+              {/* Folder Header */}
+              <div 
+                className="flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 cursor-pointer transition-colors"
+                onClick={() => toggleFolder(group.subjectCode)}
+              >
+                <div className="flex items-center space-x-3">
+                  {expandedFolders.has(group.subjectCode) ? (
+                    <ChevronDown className="h-5 w-5 text-gray-500" />
+                  ) : (
+                    <ChevronRight className="h-5 w-5 text-gray-500" />
                   )}
-                  <span className="text-gray-400">•</span>
-                  <span>By {resource.teacherName || 'Unknown'}</span>
-                </div>
-                <div className="text-xs text-gray-500 mb-1">
-                  {(() => {
-                    const t: any = resource.uploadedAt as any;
-                    const ms = t?.seconds ? t.seconds * 1000 : (t instanceof Date ? t.getTime() : 0);
-                    return ms ? new Date(ms).toLocaleString() : '';
-                  })()}
-                </div>
-                <div className="flex items-center justify-between mt-3">
-                  <div className="text-sm text-gray-500">{resource.downloads || 0} downloads</div>
-                  <div className="flex items-center gap-2">
-                    {(() => {
-                      const isPdf = (resource.fileType || '').toLowerCase().includes('pdf') || (resource.fileName || '').toLowerCase().endsWith('.pdf');
-                      const directUrl = resource.fileUrl;
-                      return (
-                        <div className="flex items-center gap-2">
-                          <a href={directUrl} target="_blank" rel="noreferrer" className="px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">Open</a>
-                          {isPdf && (
-                            <a
-                              href={`https://mozilla.github.io/pdf.js/web/viewer.html?file=${encodeURIComponent(directUrl)}`}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-                            >
-                              View (PDF.js)
-                            </a>
-                          )}
-                        </div>
-                      );
-                    })()}
-                    {canDelete(resource) && (
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(resource)}
-                        className="inline-flex items-center px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-                      >
-                        <Trash2 className="h-4 w-4 mr-1" />
-                        Delete
-                      </button>
-                    )}
+                  <Folder className="h-5 w-5 text-blue-600" />
+                  <div>
+                    <h3 className="font-semibold text-gray-900">
+                      {group.subjectCode === 'NO_CODE' ? 'Uncategorized Resources' : group.subjectCode}
+                    </h3>
+                    <p className="text-sm text-gray-600">
+                      {group.resources.length} resource{group.resources.length !== 1 ? 's' : ''}
+                      {group.resources.length > 0 && group.subjectCode !== 'NO_CODE' && (
+                        <span className="ml-2">• {group.resources[0].subject}</span>
+                      )}
+                    </p>
                   </div>
                 </div>
+                <div className="text-sm text-gray-500">
+                  {group.resources.length} files
+                </div>
               </div>
+
+              {/* Folder Content */}
+              {expandedFolders.has(group.subjectCode) && (
+                <div className="border-t border-gray-200">
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Resource</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Subject</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Semester</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Faculty</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Academic Year</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Term</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Uploaded</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Downloads</th>
+                          <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {group.resources.map((resource) => (
+                          <tr key={resource.id} className="hover:bg-gray-50 transition-colors">
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="flex items-center">
+                                <div className="flex-shrink-0 h-10 w-10">
+                                  <div className="h-10 w-10 rounded-lg bg-blue-100 flex items-center justify-center">
+                                    <FileText className="h-5 w-5 text-blue-600" />
+                                  </div>
+                                </div>
+                                <div className="ml-4">
+                                  <div className="text-sm font-medium text-gray-900 max-w-xs truncate" title={resource.fileName}>
+                                    {resource.fileName}
+                                  </div>
+                                  <div className="text-sm text-gray-500">
+                                    {resource.fileType?.split('/')[1]?.toUpperCase() || 'File'}
+                                  </div>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm text-gray-900">{resource.subject}</div>
+                              {resource.subjectCode && (
+                                <div className="text-xs text-gray-500 font-mono">{resource.subjectCode}</div>
+                              )}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                Sem {resource.semester}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm text-gray-900">{resource.teacherName || 'Unknown'}</div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm text-gray-900">{resource.academicYear}</div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                resource.term === 'odd' ? 'bg-purple-100 text-purple-800' : 'bg-green-100 text-green-800'
+                              }`}>
+                                {resource.term?.charAt(0).toUpperCase() + resource.term?.slice(1) || 'N/A'}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm text-gray-900">
+                                {(() => {
+                                  const t: any = resource.uploadedAt;
+                                  const ms = t?.seconds !== undefined
+                                    ? t.seconds * 1000
+                                    : (t instanceof Date ? t.getTime() : 0);
+                                  return ms ? new Date(ms).toLocaleDateString() : 'N/A';
+                                })()}
+                              </div>
+                              <div className="text-xs text-gray-500">
+                                {(() => {
+                                  const t: any = resource.uploadedAt;
+                                  const ms = t?.seconds !== undefined
+                                    ? t.seconds * 1000
+                                    : (t instanceof Date ? t.getTime() : 0);
+                                  return ms ? new Date(ms).toLocaleTimeString() : '';
+                                })()}
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="flex items-center">
+                                <span className="text-sm text-gray-900">{resource.downloads || 0}</span>
+                                <span className="ml-1 text-xs text-gray-500">downloads</span>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                              <div className="flex items-center justify-end space-x-2">
+                                {(() => {
+                                  const isPdf = (resource.fileType || '').toLowerCase().includes('pdf') || (resource.fileName || '').toLowerCase().endsWith('.pdf');
+                                  const directUrl = resource.fileUrl;
+                                  return (
+                                    <>
+                                      <a 
+                                        href={directUrl} 
+                                        target="_blank" 
+                                        rel="noreferrer" 
+                                        className="text-blue-600 hover:text-blue-900 transition-colors"
+                                        title="Download/Open"
+                                      >
+                                        <FileText className="h-4 w-4" />
+                                      </a>
+                                      {isPdf && (
+                                        <a
+                                          href={`https://mozilla.github.io/pdf.js/web/viewer.html?file=${encodeURIComponent(directUrl)}`}
+                                          target="_blank"
+                                          rel="noreferrer"
+                                          className="text-green-600 hover:text-green-900 transition-colors"
+                                          title="View PDF"
+                                        >
+                                          <BookOpen className="h-4 w-4" />
+                                        </a>
+                                      )}
+                                    </>
+                                  );
+                                })()}
+                                {canDelete(resource) && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDelete(resource)}
+                                    className="text-red-600 hover:text-red-900 transition-colors"
+                                    title="Delete Resource"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
             </div>
           ))}
         </div>
