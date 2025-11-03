@@ -12,10 +12,10 @@ const Resources: React.FC = () => {
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
   
   const categories = [
-    { icon: <FileText className="h-6 w-6" />, name: 'Notes', count: 150, color: 'bg-blue-100 text-blue-600' },
-    { icon: <Code className="h-6 w-6" />, name: 'Code', count: 89, color: 'bg-green-100 text-green-600' },
-    { icon: <Calculator className="h-6 w-6" />, name: 'Previous Papers', count: 45, color: 'bg-purple-100 text-purple-600' },
-    { icon: <BookOpen className="h-6 w-6" />, name: 'Books', count: 32, color: 'bg-orange-100 text-orange-600' },
+    { icon: <FileText className="h-6 w-6" />, name: 'Notes', color: 'bg-blue-100 text-blue-600' },
+    { icon: <Code className="h-6 w-6" />, name: 'Lab Manuals', color: 'bg-green-100 text-green-600' },
+    { icon: <Calculator className="h-6 w-6" />, name: 'Question Papers', color: 'bg-purple-100 text-purple-600' },
+    { icon: <BookOpen className="h-6 w-6" />, name: 'Text Books', color: 'bg-orange-100 text-orange-600' },
   ];
 
   type Role = 'admin' | 'teacher' | 'student';
@@ -232,11 +232,14 @@ const Resources: React.FC = () => {
 
               {/* Placeholder type filter (optional implementation) */}
               <select className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <option>All Types</option>
-                <option>Notes</option>
-                <option>Code</option>
-                <option>Previous Papers</option>
-                <option>Books</option>
+                 
+              <option value="">All Types</option>
+                  <option value="pdf">PDF</option>
+                  <option value="ppt">PPT</option>
+                  <option value="pptx">PPTX</option>
+                  <option value="doc">DOC</option>
+                  <option value="docx">DOCX</option>
+                  <option value="image">Images</option>
               </select>
 
               <button className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
@@ -279,7 +282,7 @@ const Resources: React.FC = () => {
                 {category.icon}
               </div>
               <h3 className="text-lg font-semibold text-gray-900 mb-1">{category.name}</h3>
-              <p className="text-gray-600">{category.count} resources</p>
+              
             </div>
           ))}
         </div>

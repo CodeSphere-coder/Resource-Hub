@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { BookOpen, Upload, Download, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { collection, getDocs, orderBy, query } from 'firebase/firestore';
+import { collection, getDocs, orderBy, query, onSnapshot, addDoc, serverTimestamp, doc, updateDoc, increment } from 'firebase/firestore';
 import { db } from '../config/firebase';
 
 const StudentDashboard: React.FC = () => {
@@ -21,7 +21,7 @@ const StudentDashboard: React.FC = () => {
 
   const studentUser = userProfile as any; // Type assertion for student-specific fields
 
-  // Resources state and types
+  // Resource type
   type Resource = {
     id: string;
     teacherId: string;
@@ -37,8 +37,20 @@ const StudentDashboard: React.FC = () => {
     uploadedAt?: { seconds: number; nanoseconds: number } | Date;
   };
 
+  // States
   const [resources, setResources] = useState<Resource[]>([]);
   const [isLoadingResources, setIsLoadingResources] = useState(false);
+  const [downloadCount, setDownloadCount] = useState(0);
+  const [recentDownloads, setRecentDownloads] = useState<Array<{
+    id: string;
+    resourceId: string;
+    fileName: string;
+    subject?: string;
+    semester?: number;
+    fileUrl?: string;
+    fileType?: string;
+    downloadedAt?: { seconds: number; nanoseconds: number } | Date | null;
+  }>>([]);
 
   // Filters
   const [filterSemester, setFilterSemester] = useState<number | ''>('');
@@ -55,6 +67,14 @@ const StudentDashboard: React.FC = () => {
   const [previewUrl, setPreviewUrl] = useState<string | undefined>(undefined);
   const [previewType, setPreviewType] = useState<string | undefined>(undefined);
 
+  // 👇 NEW: Automatically set default semester filter when student logs in
+  useEffect(() => {
+    if (studentUser?.semester) {
+      setFilterSemester(studentUser.semester);
+    }
+  }, [studentUser]);
+
+  // Fetch resources
   useEffect(() => {
     const fetchResources = async () => {
       try {
@@ -72,6 +92,22 @@ const StudentDashboard: React.FC = () => {
     fetchResources();
   }, []);
 
+  // Real-time listener for "My Downloads"
+  useEffect(() => {
+    if (!studentUser?.uid) return;
+    const downloadsRef = query(
+      collection(db, 'users', studentUser.uid, 'downloads'),
+      orderBy('downloadedAt', 'desc')
+    );
+    const unsub = onSnapshot(downloadsRef, (snap) => {
+      setDownloadCount(snap.size);
+      const list = snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) }));
+      setRecentDownloads(list as any);
+    });
+    return () => unsub();
+  }, [studentUser?.uid]);
+
+  // Filtering logic
   const filteredResources = useMemo(() => {
     return resources.filter((r) => {
       const matchesSem = filterSemester ? r.semester === Number(filterSemester) : true;
@@ -101,7 +137,6 @@ const StudentDashboard: React.FC = () => {
 
   const totalPages = Math.max(1, Math.ceil(filteredResources.length / pageSize));
 
-  // Reset to first page when filters change
   useEffect(() => {
     setPage(1);
   }, [filterSemester, filterSubject, filterYear, filterTerm, filterType, pageSize]);
@@ -113,6 +148,27 @@ const StudentDashboard: React.FC = () => {
   const closePreview = () => {
     setPreviewUrl(undefined);
     setPreviewType(undefined);
+  };
+
+  const logDownload = (resource: Resource) => {
+    try {
+      if (!studentUser?.uid) return;
+      // Write a download record under the user
+      void addDoc(collection(db, 'users', studentUser.uid, 'downloads'), {
+        resourceId: resource.id,
+        fileName: resource.fileName,
+        subject: resource.subject,
+        semester: resource.semester,
+        fileUrl: resource.fileUrl,
+        fileType: resource.fileType,
+        downloadedAt: serverTimestamp(),
+      });
+      // Increment aggregate downloads on the resource document
+      void updateDoc(doc(db, 'resources', resource.id), { downloads: increment(1) });
+    } catch (e) {
+      // Non-blocking; we don't prevent the actual file open
+      console.error('Failed to log download', e);
+    }
   };
 
   const isImage = (type: string) => type.startsWith('image/');
@@ -129,7 +185,7 @@ const StudentDashboard: React.FC = () => {
   };
 
   const stats = [
-    { label: 'Resources Downloaded', value: '24', icon: <Download className="h-5 w-5" />, color: 'bg-blue-100 text-blue-600' },
+    { label: 'Resources Downloaded', value: String(downloadCount), icon: <Download className="h-5 w-5" />, color: 'bg-blue-100 text-blue-600' },
     { label: 'Resources Uploaded', value: '8', icon: <Upload className="h-5 w-5" />, color: 'bg-green-100 text-green-600' },
     { label: 'Current Semester', value: studentUser.semester || '4', icon: <BookOpen className="h-5 w-5" />, color: 'bg-purple-100 text-purple-600' },
   ];
@@ -139,301 +195,361 @@ const StudentDashboard: React.FC = () => {
     { title: 'My Downloads', description: 'View your downloaded resources', icon: <Download className="h-6 w-6" />, href: '/downloads', color: 'bg-purple-500' },
   ];
 
-  // recentActivity removed in favor of resources list
-
-  // removed upcomingDeadlines section
-
   return (
     <>
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Welcome Header */}
-        <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-2xl text-white p-8 mb-8">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold mb-2">Welcome back, {userProfile.username}! 👋</h1>
-              <p className="text-lg opacity-90 mb-4">Ready to continue your CSE journey?</p>
-              <div className="flex items-center space-x-4 text-sm opacity-80">
-                <span>USN: {studentUser.usn}</span>
-                <span>•</span>
-                <span>Semester: {studentUser.semester || '4'}</span>
-                <span>•</span>
-                <span>Branch: {studentUser.branch || 'CSE'}</span>
+      <div className="min-h-screen bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          {/* Welcome Header */}
+          <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-2xl text-white p-8 mb-8">
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-3xl font-bold mb-2">Welcome back, {userProfile.username}! 👋</h1>
+                <p className="text-lg opacity-90 mb-4">Ready to continue your CSE journey?</p>
+                <div className="flex items-center space-x-4 text-sm opacity-80">
+                  <span>USN: {studentUser.usn}</span>
+                  <span>•</span>
+                  <span>Semester: {studentUser.semester || '4'}</span>
+                  <span>•</span>
+                  <span>Branch: {studentUser.branch || 'CSE'}</span>
+                </div>
               </div>
-            </div>
-            <div className="bg-white/20 p-4 rounded-full backdrop-blur-sm">
-              <BookOpen className="h-12 w-12 text-white" />
+              <div className="bg-white/20 p-4 rounded-full backdrop-blur-sm">
+                <BookOpen className="h-12 w-12 text-white" />
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          {stats.map((stat, index) => (
-            <div key={index} className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">{stat.label}</p>
-                  <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
-                </div>
-                <div className={`p-3 rounded-full ${stat.color}`}>
-                  {stat.icon}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Quick Actions */}
-          <div className="lg:col-span-2">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">Quick Actions</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-              {quickActions.map((action, index) => (
-                <Link
-                  key={index}
-                  to={action.href}
-                  className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-all duration-200 group"
-                >
-                  <div className={`${action.color} text-white w-12 h-12 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform`}>
-                    {action.icon}
+          {/* Stats Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            {stats.map((stat, index) => (
+              <div key={index} className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">{stat.label}</p>
+                    <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
                   </div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2 group-hover:text-blue-600 transition-colors">{action.title}</h3>
-                  <p className="text-gray-600 text-sm">{action.description}</p>
-                </Link>
-              ))}
-            </div>
-
-            {/* Resources */}
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h3 className="text-xl font-semibold text-gray-900 mb-4">Campus Resources</h3>
-              {/* Filters */}
-              <div className="grid grid-cols-1 md:grid-cols-5 gap-3 mb-4">
-                <select
-                  className="border border-gray-300 rounded-md px-3 py-2"
-                  value={filterSemester}
-                  onChange={(e) => setFilterSemester(e.target.value ? Number(e.target.value) : '')}
-                >
-                  <option value="">All Semesters</option>
-                  {Array.from({ length: 8 }, (_, i) => i + 1).map((sem) => (
-                    <option key={sem} value={sem}>{sem}</option>
-                  ))}
-                </select>
-                <input
-                  className="border border-gray-300 rounded-md px-3 py-2"
-                  placeholder="Subject"
-                  value={filterSubject}
-                  onChange={(e) => setFilterSubject(e.target.value)}
-                />
-                <input
-                  className="border border-gray-300 rounded-md px-3 py-2"
-                  placeholder="Academic Year"
-                  value={filterYear}
-                  onChange={(e) => setFilterYear(e.target.value)}
-                />
-                <select
-                  className="border border-gray-300 rounded-md px-3 py-2"
-                  value={filterTerm}
-                  onChange={(e) => setFilterTerm(e.target.value as 'odd' | 'even' | '')}
-                >
-                  <option value="">Odd/Even</option>
-                  <option value="odd">Odd</option>
-                  <option value="even">Even</option>
-                </select>
-                <select
-                  className="border border-gray-300 rounded-md px-3 py-2"
-                  value={filterType}
-                  onChange={(e) => setFilterType(e.target.value)}
-                >
-                  <option value="">All Types</option>
-                  <option value="pdf">PDF</option>
-                  <option value="ppt">PPT</option>
-                  <option value="pptx">PPTX</option>
-                  <option value="doc">DOC</option>
-                  <option value="docx">DOCX</option>
-                  <option value="image">Images</option>
-                </select>
-              </div>
-
-              {/* Quick filter toggle */}
-              <div className="flex items-center justify-between mb-4 text-sm">
-                <div className="text-gray-600">Tip: Use filters to view past semesters.</div>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setFilterSemester(studentUser.semester || '')}
-                    className="px-3 py-1.5 rounded-md border border-gray-300 hover:bg-gray-50"
-                  >
-                    My Semester
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setFilterSemester('')}
-                    className="px-3 py-1.5 rounded-md border border-gray-300 hover:bg-gray-50"
-                  >
-                    All Semesters
-                  </button>
+                  <div className={`p-3 rounded-full ${stat.color}`}>
+                    {stat.icon}
+                  </div>
                 </div>
               </div>
+            ))}
+          </div>
 
-              {/* Subject quick chips */}
-              {uniqueSubjects.length > 0 && (
-                <div className="flex flex-wrap gap-2 mb-4">
-                  {uniqueSubjects.slice(0, 12).map((subj) => {
-                    const active = filterSubject.toLowerCase() === subj.toLowerCase();
-                    return (
-                      <button
-                        key={subj}
-                        onClick={() => setFilterSubject(active ? '' : subj)}
-                        className={`px-3 py-1.5 rounded-full text-sm border ${active ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}
-                      >
-                        {subj}
-                      </button>
-                    );
-                  })}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Quick Actions */}
+            <div className="lg:col-span-2">
+              <h2 className="text-2xl font-bold text-gray-900 mb-6">Quick Actions</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                {quickActions.map((action, index) => (
+                  <Link
+                    key={index}
+                    to={action.href}
+                    className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-all duration-200 group relative"
+                  >
+                    {action.title === 'My Downloads' && downloadCount > 0 && (
+                      <span className="absolute top-2 right-2 bg-purple-600 text-white text-xs px-2 py-0.5 rounded-full">
+                        {downloadCount}
+                      </span>
+                    )}
+                    <div className={`${action.color} text-white w-12 h-12 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform`}>
+                      {action.icon}
+                    </div>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2 group-hover:text-blue-600 transition-colors">{action.title}</h3>
+                    <p className="text-gray-600 text-sm">{action.description}</p>
+                  </Link>
+                ))}
+              </div>
+
+              {/* My Downloads (Realtime) */}
+              <div className="bg-white rounded-lg shadow-md p-6 mb-8">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-xl font-semibold text-gray-900">My Downloads</h3>
+                  <Link to="/downloads" className="text-sm text-blue-600 hover:underline">View all</Link>
                 </div>
-              )}
-
-              {isLoadingResources ? (
-                <div className="text-sm text-gray-500">Loading resources...</div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200 text-sm">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-4 py-2 text-left font-medium text-gray-600">Title</th>
-                        <th className="px-4 py-2 text-left font-medium text-gray-600">Subject</th>
-                        <th className="px-4 py-2 text-left font-medium text-gray-600">Sem</th>
-                        <th className="px-4 py-2 text-left font-medium text-gray-600">Year</th>
-                        <th className="px-4 py-2 text-left font-medium text-gray-600">Term</th>
-                        <th className="px-4 py-2 text-left font-medium text-gray-600">Type</th>
-                        <th className="px-4 py-2 text-left font-medium text-gray-600">Uploaded</th>
-                        <th className="px-4 py-2"></th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {paginatedResources.map((r) => (
-                        <tr key={r.id} className="hover:bg-gray-50">
-                          <td className="px-4 py-2 font-medium text-gray-900 truncate max-w-[260px]">{r.fileName}</td>
-                          <td className="px-4 py-2">{r.subject}</td>
-                          <td className="px-4 py-2">{r.semester}</td>
-                          <td className="px-4 py-2">{r.academicYear}</td>
-                          <td className="px-4 py-2 capitalize">{r.term}</td>
-                          <td className="px-4 py-2">{r.fileType?.split('/')[1]?.toUpperCase() || 'File'}</td>
-                          <td className="px-4 py-2 text-xs text-gray-600">
-                            {r.uploadedAt && 'seconds' in (r.uploadedAt as any)
-                              ? new Date((r.uploadedAt as any).seconds * 1000).toLocaleString()
-                              : (r.uploadedAt instanceof Date ? r.uploadedAt.toLocaleString() : '-')}
-                          </td>
-                          <td className="px-4 py-2 space-x-2 text-right">
-                            <button
-                              onClick={() => openPreview(r.fileUrl, r.fileType)}
-                              className="inline-flex items-center px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                            >
-                              Preview
-                            </button>
-                            <a
-                              href={r.fileUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="inline-flex items-center px-3 py-1.5 bg-gray-100 text-gray-800 rounded-md hover:bg-gray-200"
-                              download
-                            >
-                              Download
-                            </a>
-                          </td>
-                        </tr>
-                      ))}
-                      {filteredResources.length === 0 && (
+                {recentDownloads.length === 0 ? (
+                  <div className="text-sm text-gray-500">No downloads yet.</div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200 text-sm">
+                      <thead className="bg-gray-50">
                         <tr>
-                          <td className="px-4 py-6 text-center text-gray-500" colSpan={8}>No resources found.</td>
+                          <th className="px-4 py-2 text-left font-medium text-gray-600">Title</th>
+                          <th className="px-4 py-2 text-left font-medium text-gray-600">Subject</th>
+                          <th className="px-4 py-2 text-left font-medium text-gray-600">Sem</th>
+                          <th className="px-4 py-2 text-left font-medium text-gray-600">When</th>
+                          <th className="px-4 py-2"></th>
                         </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {recentDownloads.slice(0, 10).map((d) => (
+                          <tr key={d.id} className="hover:bg-gray-50">
+                            <td className="px-4 py-2 font-medium text-gray-900 truncate max-w-[260px]">{d.fileName}</td>
+                            <td className="px-4 py-2">{d.subject || '-'}</td>
+                            <td className="px-4 py-2">{d.semester ?? '-'}</td>
+                            <td className="px-4 py-2 text-xs text-gray-600">
+                              {d.downloadedAt && (d as any).downloadedAt?.seconds !== undefined
+                                ? new Date((d as any).downloadedAt.seconds * 1000).toLocaleString()
+                                : (d.downloadedAt instanceof Date ? d.downloadedAt.toLocaleString() : '-')}
+                            </td>
+                            <td className="px-4 py-2 text-right">
+                              {d.fileUrl ? (
+                                <a
+                                  href={d.fileUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="inline-flex items-center px-3 py-1.5 bg-gray-100 text-gray-800 rounded-md hover:bg-gray-200"
+                                >
+                                  Open
+                                </a>
+                              ) : (
+                                <Link
+                                  to={`/resources?focus=${encodeURIComponent(d.resourceId)}`}
+                                  className="text-blue-600 hover:underline"
+                                >
+                                  View Resource
+                                </Link>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
 
-              {/* Pagination controls */}
-              <div className="mt-4 flex items-center justify-between text-sm">
-                <div className="flex items-center gap-2">
-                  <span className="text-gray-600">Rows per page:</span>
+              {/* Campus Resources */}
+              <div className="bg-white rounded-lg shadow-md p-6">
+                <h3 className="text-xl font-semibold text-gray-900 mb-4">Campus Resources</h3>
+                
+                {/* Filters */}
+                <div className="grid grid-cols-1 md:grid-cols-5 gap-3 mb-4">
                   <select
-                    className="border border-gray-300 rounded-md px-2 py-1"
-                    value={pageSize}
-                    onChange={(e) => setPageSize(Number(e.target.value))}
+                    className="border border-gray-300 rounded-md px-3 py-2"
+                    value={filterSemester}
+                    onChange={(e) => setFilterSemester(e.target.value ? Number(e.target.value) : '')}
                   >
-                    {[5, 10, 20, 50].map((n) => (
-                      <option key={n} value={n}>{n}</option>
+                    <option value="">All Semesters</option>
+                    {Array.from({ length: 8 }, (_, i) => i + 1).map((sem) => (
+                      <option key={sem} value={sem}>{sem}</option>
                     ))}
                   </select>
+                  <input
+                    className="border border-gray-300 rounded-md px-3 py-2"
+                    placeholder="Subject"
+                    value={filterSubject}
+                    onChange={(e) => setFilterSubject(e.target.value)}
+                  />
+                  <input
+                    className="border border-gray-300 rounded-md px-3 py-2"
+                    placeholder="Academic Year"
+                    value={filterYear}
+                    onChange={(e) => setFilterYear(e.target.value)}
+                  />
+                  <select
+                    className="border border-gray-300 rounded-md px-3 py-2"
+                    value={filterTerm}
+                    onChange={(e) => setFilterTerm(e.target.value as 'odd' | 'even' | '')}
+                  >
+                    <option value="">Odd/Even</option>
+                    <option value="odd">Odd</option>
+                    <option value="even">Even</option>
+                  </select>
+                  <select
+                    className="border border-gray-300 rounded-md px-3 py-2"
+                    value={filterType}
+                    onChange={(e) => setFilterType(e.target.value)}
+                  >
+                    <option value="">All Types</option>
+                    <option value="pdf">PDF</option>
+                    <option value="ppt">PPT</option>
+                    <option value="pptx">PPTX</option>
+                    <option value="doc">DOC</option>
+                    <option value="docx">DOCX</option>
+                    <option value="image">Images</option>
+                  </select>
                 </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-gray-600">Page {page} of {totalPages}</span>
+
+                {/* Quick filter toggle */}
+                <div className="flex items-center justify-between mb-4 text-sm">
+                  <div className="text-gray-600">Tip: Use filters to view past semesters.</div>
                   <div className="flex items-center gap-2">
                     <button
-                      className="px-3 py-1.5 rounded-md border border-gray-300 disabled:opacity-50"
-                      onClick={() => setPage((p) => Math.max(1, p - 1))}
-                      disabled={page <= 1}
+                      type="button"
+                      onClick={() => setFilterSemester(studentUser.semester || '')}
+                      className="px-3 py-1.5 rounded-md border border-gray-300 hover:bg-gray-50"
                     >
-                      Prev
+                      My Semester
                     </button>
                     <button
-                      className="px-3 py-1.5 rounded-md border border-gray-300 disabled:opacity-50"
-                      onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                      disabled={page >= totalPages}
+                      type="button"
+                      onClick={() => setFilterSemester('')}
+                      className="px-3 py-1.5 rounded-md border border-gray-300 hover:bg-gray-50"
                     >
-                      Next
+                      All Semesters
                     </button>
+                  </div>
+                </div>
+
+                {/* Subject Chips */}
+                {uniqueSubjects.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mb-4">
+                    {uniqueSubjects.slice(0, 12).map((subj) => {
+                      const active = filterSubject.toLowerCase() === subj.toLowerCase();
+                      return (
+                        <button
+                          key={subj}
+                          onClick={() => setFilterSubject(active ? '' : subj)}
+                          className={`px-3 py-1.5 rounded-full text-sm border ${active ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}
+                        >
+                          {subj}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Resources Table */}
+                {isLoadingResources ? (
+                  <div className="text-sm text-gray-500">Loading resources...</div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200 text-sm">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-4 py-2 text-left font-medium text-gray-600">Title</th>
+                          <th className="px-4 py-2 text-left font-medium text-gray-600">Subject</th>
+                          <th className="px-4 py-2 text-left font-medium text-gray-600">Sem</th>
+                          <th className="px-4 py-2 text-left font-medium text-gray-600">Year</th>
+                          <th className="px-4 py-2 text-left font-medium text-gray-600">Term</th>
+                          <th className="px-4 py-2 text-left font-medium text-gray-600">Type</th>
+                          <th className="px-4 py-2 text-left font-medium text-gray-600">Uploaded</th>
+                          <th className="px-4 py-2"></th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {paginatedResources.map((r) => (
+                          <tr key={r.id} className="hover:bg-gray-50">
+                            <td className="px-4 py-2 font-medium text-gray-900 truncate max-w-[260px]">{r.fileName}</td>
+                            <td className="px-4 py-2">{r.subject}</td>
+                            <td className="px-4 py-2">{r.semester}</td>
+                            <td className="px-4 py-2">{r.academicYear}</td>
+                            <td className="px-4 py-2 capitalize">{r.term}</td>
+                            <td className="px-4 py-2">{r.fileType?.split('/')[1]?.toUpperCase() || 'File'}</td>
+                            <td className="px-4 py-2 text-xs text-gray-600">
+                              {r.uploadedAt && 'seconds' in (r.uploadedAt as any)
+                                ? new Date((r.uploadedAt as any).seconds * 1000).toLocaleString()
+                                : (r.uploadedAt instanceof Date ? r.uploadedAt.toLocaleString() : '-')}
+                            </td>
+                            <td className="px-4 py-2 space-x-2 text-right">
+                              <button
+                                onClick={() => openPreview(r.fileUrl, r.fileType)}
+                                className="inline-flex items-center px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                              >
+                                Preview
+                              </button>
+                              <a
+                                href={r.fileUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center px-3 py-1.5 bg-gray-100 text-gray-800 rounded-md hover:bg-gray-200"
+                                onClick={() => logDownload(r)}
+                                download
+                              >
+                                Download
+                              </a>
+                            </td>
+                          </tr>
+                        ))}
+                        {filteredResources.length === 0 && (
+                          <tr>
+                            <td className="px-4 py-6 text-center text-gray-500" colSpan={8}>No resources found.</td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {/* Pagination */}
+                <div className="mt-4 flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-600">Rows per page:</span>
+                    <select
+                      className="border border-gray-300 rounded-md px-2 py-1"
+                      value={pageSize}
+                      onChange={(e) => setPageSize(Number(e.target.value))}
+                    >
+                      {[5, 10, 20, 50].map((n) => (
+                        <option key={n} value={n}>{n}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-gray-600">Page {page} of {totalPages}</span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        className="px-3 py-1.5 rounded-md border border-gray-300 disabled:opacity-50"
+                        onClick={() => setPage((p) => Math.max(1, p - 1))}
+                        disabled={page <= 1}
+                      >
+                        Prev
+                      </button>
+                      <button
+                        className="px-3 py-1.5 rounded-md border border-gray-300 disabled:opacity-50"
+                        onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                        disabled={page >= totalPages}
+                      >
+                        Next
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
 
-          {/* Sidebar */}
-          <div className="space-y-6">
-            {/* Removed Semester Progress */}
+            {/* Sidebar placeholder */}
+            <div className="space-y-6"></div>
           </div>
         </div>
       </div>
-    </div>
 
-    {/* Preview Modal */}
-    {previewUrl && (
-      <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
-        <div className="bg-white w-full max-w-5xl h-[80vh] rounded-lg overflow-hidden shadow-xl relative">
-          <button
-            onClick={closePreview}
-            className="absolute top-3 right-3 p-2 rounded-full bg-gray-100 hover:bg-gray-200"
-            aria-label="Close preview"
-          >
-            <X className="h-5 w-5" />
-          </button>
-          <div className="w-full h-full bg-gray-50">
-            {isImage(previewType || '') ? (
-              <img src={previewUrl!} alt="Preview" className="w-full h-full object-contain" />
-            ) : isPdf(previewType || '') ? (
-              <iframe
-                title="PDF Preview"
-                src={`https://drive.google.com/viewerng/viewer?embedded=1&url=${encodeURIComponent(previewUrl!)}`}
-                className="w-full h-full"
-              />
-            ) : isDoc(previewType || '') || isPpt(previewType || '') ? (
-              <iframe
-                title="Doc Preview"
-                src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(previewUrl!)}`}
-                className="w-full h-full"
-              />
-            ) : (
-              <div className="h-full flex items-center justify-center text-gray-600 text-sm">
-                Preview not available for this file type. Use Download instead.
-              </div>
-            )}
+      {/* Preview Modal */}
+      {previewUrl && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-5xl h-[80vh] rounded-lg overflow-hidden shadow-xl relative">
+            <button
+              onClick={closePreview}
+              className="absolute top-3 right-3 p-2 rounded-full bg-gray-100 hover:bg-gray-200"
+              aria-label="Close preview"
+            >
+              <X className="h-5 w-5" />
+            </button>
+            <div className="w-full h-full bg-gray-50">
+              {isImage(previewType || '') ? (
+                <img src={previewUrl!} alt="Preview" className="w-full h-full object-contain" />
+              ) : isPdf(previewType || '') ? (
+                <iframe
+                  title="PDF Preview"
+                  src={`https://drive.google.com/viewerng/viewer?embedded=1&url=${encodeURIComponent(previewUrl!)}`}
+                  className="w-full h-full"
+                />
+              ) : isDoc(previewType || '') || isPpt(previewType || '') ? (
+                <iframe
+                  title="Doc Preview"
+                  src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(previewUrl!)}`}
+                  className="w-full h-full"
+                />
+              ) : (
+                <div className="h-full flex items-center justify-center text-gray-600 text-sm">
+                  Preview not available for this file type. Use Download instead.
+                </div>
+              )}
+            </div>
           </div>
         </div>
-      </div>
-    )}
+      )}
     </>
   );
 };

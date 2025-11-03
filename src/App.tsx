@@ -14,6 +14,7 @@ import AdminUsers from './pages/AdminUsers';
 import AdminUpload from './pages/AdminUpload';
 import Resources from './pages/Resources';
 import Semesters from './pages/Semesters';
+import MyDownloads from './pages/MyDownloads';
 
 function App() {
   return (
@@ -71,6 +72,14 @@ function App() {
                 element={
                   <ProtectedRoute>
                     <Resources />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/downloads" 
+                element={
+                  <ProtectedRoute>
+                    <MyDownloads />
                   </ProtectedRoute>
                 } 
               />

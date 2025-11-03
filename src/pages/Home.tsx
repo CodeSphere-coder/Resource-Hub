@@ -79,8 +79,8 @@ const Home: React.FC = () => {
     },
     {
       icon: <Calculator className="h-8 w-8" />,
-      title: 'Previous Year Papers',
-      description: 'Question papers and solutions from previous examinations',
+      title: 'Question Papers',
+      description: 'Question papers from previous examinations',
     },
     {
       icon: <Upload className="h-8 w-8" />,

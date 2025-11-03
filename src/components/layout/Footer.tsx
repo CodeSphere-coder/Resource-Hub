@@ -30,19 +30,17 @@ const Footer: React.FC = () => {
           <div>
             <h3 className="text-lg font-semibold mb-4">Connect</h3>
             <div className="flex space-x-4 mb-4">
-              <a href="https://github.com/yourgithub" target="_blank" rel="noopener noreferrer" className="text-gray-300 hover:text-white transition-colors">
-                <Github className="h-6 w-6" />
-              </a>
-              <a href="mailto:collegeemail@example.com" className="text-gray-300 hover:text-white transition-colors">
+               
+              <a href="mailto:info@agadiengcollege.com" className="text-gray-300 hover:text-white transition-colors">
                 <Mail className="h-6 w-6" />
               </a>
-              <a href="https://www.linkedin.com/school/yourcollege/" target="_blank" rel="noopener noreferrer" className="text-gray-300 hover:text-white transition-colors">
+              <a href="https://www.linkedin.com/groups/12373563" target="_blank" rel="noopener noreferrer" className="text-gray-300 hover:text-white transition-colors">
                 <Linkedin className="h-6 w-6" />
               </a>
             </div>
             <div className="text-gray-300 space-y-1">
               <p><strong>Phone:</strong> <a href="tel:+91 8095791205" className="hover:text-white">+91 80957 91205</a></p>
-              <p><strong>Email:</strong> <a href="mailto:collegeemail@example.com" className="hover:text-white">collegeemail@example.com</a></p>
+              <p><strong>Email:</strong> <a href="mailto:info@agadiengcollege.com" className="hover:text-white">info@agadiengcollege.com</a></p>
             </div>
           </div>
         </div>
