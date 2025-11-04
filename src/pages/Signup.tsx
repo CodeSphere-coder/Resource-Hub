@@ -42,11 +42,13 @@ const Signup: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Username: only letters
-    if (!/^[A-Za-z]+$/.test(username)) {
-      return setError('Username must contain letters only (no numbers or special characters).');
-    }
+  
+    // Username: letters and spaces only
+if (!/^[A-Za-z ]+$/.test(username)) {
+  return setError('Username can only contain letters and spaces.');
+}
 
+    
     // Email: must end with @gmail.com (case-insensitive)
     if (!/^[^\s@]+@gmail\.com$/i.test(email)) {
       return setError('Email must be a valid Gmail address ending with @gmail.com.');

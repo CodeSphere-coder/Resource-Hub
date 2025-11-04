@@ -213,8 +213,7 @@ const AdminDashboard: React.FC = () => {
               <div className="flex items-center space-x-4 text-sm opacity-80">
                 <span>Role: System Administrator</span>
                 <span>•</span>
-                <span>Permissions: {adminUser.permissions?.length || 0} granted</span>
-                <span>•</span>
+                 
                 <span>Last login: Today</span>
               </div>
             </div>

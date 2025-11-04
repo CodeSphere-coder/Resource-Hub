@@ -1,13 +1,32 @@
-import React, { useEffect, useMemo, useState } from 'react';
+ import React, { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { BookOpen, Upload, Download, X } from 'lucide-react';
+import { BookOpen, Upload, Download, Search, Filter, FileText, Code, Calculator,Trash2, Folder, ChevronDown, ChevronRight, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { collection, getDocs, orderBy, query, onSnapshot, addDoc, serverTimestamp, doc, updateDoc, increment } from 'firebase/firestore';
+import {
+  collection,
+  getDocs,
+  orderBy,
+  query,
+  onSnapshot,
+  addDoc,
+  serverTimestamp,
+  doc,
+  updateDoc,
+  increment,
+} from 'firebase/firestore';
 import { db } from '../config/firebase';
 
 const StudentDashboard: React.FC = () => {
   const { userProfile } = useAuth();
 
+   const categories = [
+    { icon: <FileText className="h-6 w-6" />, name: 'Notes', color: 'bg-blue-100 text-blue-600' },
+    { icon: <Code className="h-6 w-6" />, name: 'Lab Manuals', color: 'bg-green-100 text-green-600' },
+    { icon: <Calculator className="h-6 w-6" />, name: 'Question Papers', color: 'bg-purple-100 text-purple-600' },
+    { icon: <BookOpen className="h-6 w-6" />, name: 'Text Books', color: 'bg-orange-100 text-orange-600' },
+  ];
+
+  // --- Handle Unavailable Profile ---
   if (!userProfile || userProfile.role !== 'student') {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -19,9 +38,7 @@ const StudentDashboard: React.FC = () => {
     );
   }
 
-  const studentUser = userProfile as any; // Type assertion for student-specific fields
-
-  // Resource type
+  // --- Type definitions ---
   type Resource = {
     id: string;
     teacherId: string;
@@ -37,51 +54,36 @@ const StudentDashboard: React.FC = () => {
     uploadedAt?: { seconds: number; nanoseconds: number } | Date;
   };
 
-  // States
+  const studentUser = userProfile as any;
+
+  // --- States ---
   const [resources, setResources] = useState<Resource[]>([]);
   const [isLoadingResources, setIsLoadingResources] = useState(false);
   const [downloadCount, setDownloadCount] = useState(0);
-  const [recentDownloads, setRecentDownloads] = useState<Array<{
-    id: string;
-    resourceId: string;
-    fileName: string;
-    subject?: string;
-    semester?: number;
-    fileUrl?: string;
-    fileType?: string;
-    downloadedAt?: { seconds: number; nanoseconds: number } | Date | null;
-  }>>([]);
-
-  // Filters
+  const [recentDownloads, setRecentDownloads] = useState<any[]>([]);
   const [filterSemester, setFilterSemester] = useState<number | ''>('');
   const [filterSubject, setFilterSubject] = useState('');
   const [filterYear, setFilterYear] = useState('');
   const [filterTerm, setFilterTerm] = useState<'odd' | 'even' | ''>('');
   const [filterType, setFilterType] = useState<string>('');
-
-  // Pagination
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [previewUrl, setPreviewUrl] = useState<string>();
+  const [previewType, setPreviewType] = useState<string>();
 
-  // Preview modal
-  const [previewUrl, setPreviewUrl] = useState<string | undefined>(undefined);
-  const [previewType, setPreviewType] = useState<string | undefined>(undefined);
-
-  // 👇 NEW: Automatically set default semester filter when student logs in
+  // --- Auto-set default semester ---
   useEffect(() => {
-    if (studentUser?.semester) {
-      setFilterSemester(studentUser.semester);
-    }
+    if (studentUser?.semester) setFilterSemester(studentUser.semester);
   }, [studentUser]);
 
-  // Fetch resources
+  // --- Fetch Resources ---
   useEffect(() => {
     const fetchResources = async () => {
       try {
         setIsLoadingResources(true);
         const q = query(collection(db, 'resources'), orderBy('uploadedAt', 'desc'));
         const snap = await getDocs(q);
-        const items: Resource[] = snap.docs.map((doc) => ({ id: doc.id, ...(doc.data() as any) }));
+        const items: Resource[] = snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) }));
         setResources(items);
       } catch (e) {
         console.error('Failed to load resources', e);
@@ -92,7 +94,7 @@ const StudentDashboard: React.FC = () => {
     fetchResources();
   }, []);
 
-  // Real-time listener for "My Downloads"
+  // --- Real-time Listener for Downloads ---
   useEffect(() => {
     if (!studentUser?.uid) return;
     const downloadsRef = query(
@@ -101,105 +103,97 @@ const StudentDashboard: React.FC = () => {
     );
     const unsub = onSnapshot(downloadsRef, (snap) => {
       setDownloadCount(snap.size);
-      const list = snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) }));
-      setRecentDownloads(list as any);
+      setRecentDownloads(snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })));
     });
     return () => unsub();
   }, [studentUser?.uid]);
 
-  // Filtering logic
+  // --- Filtering Logic ---
   const filteredResources = useMemo(() => {
     return resources.filter((r) => {
       const matchesSem = filterSemester ? r.semester === Number(filterSemester) : true;
-      const matchesSubj = filterSubject ? r.subject.toLowerCase().includes(filterSubject.toLowerCase()) : true;
-      const matchesYear = filterYear ? r.academicYear.toLowerCase().includes(filterYear.toLowerCase()) : true;
+      const matchesSubj = filterSubject
+        ? r.subject.toLowerCase().includes(filterSubject.toLowerCase())
+        : true;
+      const matchesYear = filterYear
+        ? r.academicYear.toLowerCase().includes(filterYear.toLowerCase())
+        : true;
       const matchesTerm = filterTerm ? r.term === filterTerm : true;
       const ft = filterType.toLowerCase();
       const matchesType = ft
-        ? (ft === 'image' ? r.fileType?.startsWith('image/') : (r.fileType?.toLowerCase().includes(ft) || r.fileName?.toLowerCase().endsWith(ft)))
+        ? ft === 'image'
+          ? r.fileType?.startsWith('image/')
+          : r.fileType?.toLowerCase().includes(ft) ||
+            r.fileName?.toLowerCase().endsWith(ft)
         : true;
       return matchesSem && matchesSubj && matchesYear && matchesTerm && matchesType;
     });
   }, [resources, filterSemester, filterSubject, filterYear, filterTerm, filterType]);
 
-  const uniqueSubjects = useMemo(() => {
-    const set = new Set<string>();
-    resources.forEach((r) => {
-      if (r.subject) set.add(r.subject);
-    });
-    return Array.from(set).sort((a, b) => a.localeCompare(b));
-  }, [resources]);
-
+  // --- Pagination ---
+  const totalPages = Math.max(1, Math.ceil(filteredResources.length / pageSize));
   const paginatedResources = useMemo(() => {
     const start = (page - 1) * pageSize;
     return filteredResources.slice(start, start + pageSize);
   }, [filteredResources, page, pageSize]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredResources.length / pageSize));
+  useEffect(() => setPage(1), [filterSemester, filterSubject, filterYear, filterTerm, filterType, pageSize]);
 
-  useEffect(() => {
-    setPage(1);
-  }, [filterSemester, filterSubject, filterYear, filterTerm, filterType, pageSize]);
-
-  const openPreview = (fileUrl: string, fileType: string) => {
-    setPreviewType(fileType);
-    setPreviewUrl(fileUrl);
+  // --- Helpers ---
+  const openPreview = (url: string, type: string) => {
+    setPreviewUrl(url);
+    setPreviewType(type);
   };
   const closePreview = () => {
     setPreviewUrl(undefined);
     setPreviewType(undefined);
   };
-
-  const logDownload = (resource: Resource) => {
-    try {
-      if (!studentUser?.uid) return;
-      // Write a download record under the user
-      void addDoc(collection(db, 'users', studentUser.uid, 'downloads'), {
-        resourceId: resource.id,
-        fileName: resource.fileName,
-        subject: resource.subject,
-        semester: resource.semester,
-        fileUrl: resource.fileUrl,
-        fileType: resource.fileType,
-        downloadedAt: serverTimestamp(),
-      });
-      // Increment aggregate downloads on the resource document
-      void updateDoc(doc(db, 'resources', resource.id), { downloads: increment(1) });
-    } catch (e) {
-      // Non-blocking; we don't prevent the actual file open
-      console.error('Failed to log download', e);
-    }
+  const logDownload = (r: Resource) => {
+    if (!studentUser?.uid) return;
+    addDoc(collection(db, 'users', studentUser.uid, 'downloads'), {
+      resourceId: r.id,
+      fileName: r.fileName,
+      subject: r.subject,
+      semester: r.semester,
+      fileUrl: r.fileUrl,
+      fileType: r.fileType,
+      downloadedAt: serverTimestamp(),
+    });
+    updateDoc(doc(db, 'resources', r.id), { downloads: increment(1) });
   };
 
-  const isImage = (type: string) => type.startsWith('image/');
-  const isPdf = (type: string, name?: string) => type === 'application/pdf' || (name || '').toLowerCase().endsWith('.pdf');
-  const isDoc = (type: string, name?: string) => {
-    const t = type.toLowerCase();
-    const n = (name || '').toLowerCase();
-    return t.includes('msword') || t.includes('officedocument.wordprocessingml') || n.endsWith('.doc') || n.endsWith('.docx');
-  };
-  const isPpt = (type: string, name?: string) => {
-    const t = type.toLowerCase();
-    const n = (name || '').toLowerCase();
-    return t.includes('powerpoint') || t.includes('officedocument.presentationml') || n.endsWith('.ppt') || n.endsWith('.pptx');
-  };
+  const isImage = (t: string) => t.startsWith('image/');
+  const isPdf = (t: string, n?: string) => t === 'application/pdf' || (n || '').endsWith('.pdf');
+  const isDoc = (t: string, n?: string) =>
+    t.includes('msword') || t.includes('officedocument.wordprocessingml') || (n || '').endsWith('.docx');
+  const isPpt = (t: string, n?: string) =>
+    t.includes('powerpoint') || t.includes('officedocument.presentationml') || (n || '').endsWith('.pptx');
 
-  const stats = [
-    { label: 'Resources Downloaded', value: String(downloadCount), icon: <Download className="h-5 w-5" />, color: 'bg-blue-100 text-blue-600' },
-    { label: 'Resources Uploaded', value: '8', icon: <Upload className="h-5 w-5" />, color: 'bg-green-100 text-green-600' },
-    { label: 'Current Semester', value: studentUser.semester || '4', icon: <BookOpen className="h-5 w-5" />, color: 'bg-purple-100 text-purple-600' },
-  ];
+  // --- Stats + Actions ---
+   const stats = [
+  { label: 'Resources Uploaded', value: '8', icon: <Upload className="h-5 w-5" />, color: 'bg-green-100 text-green-600' },
+  { label: 'Current Semester', value: studentUser.semester, icon: <BookOpen className="h-5 w-5" />, color: 'bg-purple-100 text-purple-600' },
+];
+
 
   const quickActions = [
-    { title: 'Browse Resources', description: 'Find study materials for your semester', icon: <BookOpen className="h-6 w-6" />, href: '/resources', color: 'bg-blue-500' },
-    { title: 'My Downloads', description: 'View your downloaded resources', icon: <Download className="h-6 w-6" />, href: '/downloads', color: 'bg-purple-500' },
-  ];
+  { 
+    title: 'Browse Resources', 
+    description: 'Find study materials for your semester', 
+    icon: <BookOpen className="h-6 w-6" />, 
+    href: '/resources', 
+    color: 'bg-blue-500' 
+  },
+];
 
+
+  // --- UI ---
   return (
     <>
       <div className="min-h-screen bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          {/* Welcome Header */}
+
+          {/* --- Header --- */}
           <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-2xl text-white p-8 mb-8">
             <div className="flex items-center justify-between">
               <div>
@@ -208,9 +202,9 @@ const StudentDashboard: React.FC = () => {
                 <div className="flex items-center space-x-4 text-sm opacity-80">
                   <span>USN: {studentUser.usn}</span>
                   <span>•</span>
-                  <span>Semester: {studentUser.semester || '4'}</span>
+                  <span>Semester: {studentUser.semester}</span>
                   <span>•</span>
-                  <span>Branch: {studentUser.branch || 'CSE'}</span>
+                  <span>Branch: CSE{studentUser.branch}</span>
                 </div>
               </div>
               <div className="bg-white/20 p-4 rounded-full backdrop-blur-sm">
@@ -218,311 +212,174 @@ const StudentDashboard: React.FC = () => {
               </div>
             </div>
           </div>
+  
 
-          {/* Stats Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            {stats.map((stat, index) => (
-              <div key={index} className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">{stat.label}</p>
-                    <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
-                  </div>
-                  <div className={`p-3 rounded-full ${stat.color}`}>
-                    {stat.icon}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
+{/* --- Stats --- */}
+<div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6 mb-8">
+  {stats.map((s, i) => (
+    <div key={i} className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm font-medium text-gray-600">{s.label}</p>
+          <p className="text-2xl font-bold text-gray-900">{s.value}</p>
+        </div>
+        <div className={`p-3 rounded-full ${s.color}`}>{s.icon}</div>
+      </div>
+    </div>
+  ))}
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Quick Actions */}
-            <div className="lg:col-span-2">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6">Quick Actions</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                {quickActions.map((action, index) => (
-                  <Link
-                    key={index}
-                    to={action.href}
-                    className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-all duration-200 group relative"
-                  >
-                    {action.title === 'My Downloads' && downloadCount > 0 && (
-                      <span className="absolute top-2 right-2 bg-purple-600 text-white text-xs px-2 py-0.5 rounded-full">
-                        {downloadCount}
-                      </span>
-                    )}
-                    <div className={`${action.color} text-white w-12 h-12 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform`}>
-                      {action.icon}
-                    </div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2 group-hover:text-blue-600 transition-colors">{action.title}</h3>
-                    <p className="text-gray-600 text-sm">{action.description}</p>
-                  </Link>
+  {/* Browse Resources Card */}
+  <Link
+    to="/resources"
+    className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow flex items-center justify-between cursor-pointer"
+  >
+    <div>
+      <p className="text-sm font-medium text-gray-600">Browse Resources</p>
+      <p className="text-2xl font-bold text-gray-900">Access Now</p>
+    </div>
+    <div className="p-3 rounded-full bg-blue-100 text-blue-600">
+      <Search className="w-6 h-6" /> {/* changed icon */}
+    </div>
+  </Link>
+</div>
+
+
+
+          {/* --- Study Categories --- */}
+<h2 className="text-2xl font-bold text-gray-900 mb-6">Study Categories</h2>
+<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 mb-10">
+  {categories.map((cat, i) => (
+    <div
+      key={i}
+      className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-all duration-200 flex flex-col items-center text-center group"
+    >
+      <div
+        className={`${cat.color} w-16 h-16 flex items-center justify-center rounded-full mb-4 group-hover:scale-110 transition-transform`}
+      >
+        {cat.icon}
+      </div>
+      <h3 className="text-lg font-semibold text-gray-900 mb-2 group-hover:text-blue-600 transition-colors">
+        {cat.name}
+      </h3>
+      <p className="text-gray-600 text-sm">Explore {cat.name.toLowerCase()} shared by faculty</p>
+    </div>
+  ))}
+</div>
+
+
+          {/* --- Campus Resources (WIDER) --- */}
+          <div className="bg-white rounded-lg shadow-md p-8 mb-12 w-full">
+            <h3 className="text-2xl font-semibold text-gray-900 mb-6">Campus Resources</h3>
+
+            {/* Filters */}
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-3 mb-6">
+              <select
+                className="border border-gray-300 rounded-md px-3 py-2"
+                value={filterSemester}
+                onChange={(e) => setFilterSemester(e.target.value ? Number(e.target.value) : '')}
+              >
+                <option value="">All Semesters</option>
+                {Array.from({ length: 8 }, (_, i) => i + 1).map((s) => (
+                  <option key={s} value={s}>{s}</option>
                 ))}
-              </div>
+              </select>
+              <input className="border border-gray-300 rounded-md px-3 py-2" placeholder="Subject" value={filterSubject} onChange={(e) => setFilterSubject(e.target.value)} />
+              <input className="border border-gray-300 rounded-md px-3 py-2" placeholder="Academic Year" value={filterYear} onChange={(e) => setFilterYear(e.target.value)} />
+              <select className="border border-gray-300 rounded-md px-3 py-2" value={filterTerm} onChange={(e) => setFilterTerm(e.target.value as any)}>
+                <option value="">Odd/Even</option>
+                <option value="odd">Odd</option>
+                <option value="even">Even</option>
+              </select>
+              <select className="border border-gray-300 rounded-md px-3 py-2" value={filterType} onChange={(e) => setFilterType(e.target.value)}>
+                <option value="">All Types</option>
+                <option value="pdf">PDF</option>
+                <option value="ppt">PPT</option>
+                <option value="doc">DOC</option>
+                <option value="image">Images</option>
+              </select>
+            </div>
 
-              {/* My Downloads (Realtime) */}
-              <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-xl font-semibold text-gray-900">My Downloads</h3>
-                  <Link to="/downloads" className="text-sm text-blue-600 hover:underline">View all</Link>
-                </div>
-                {recentDownloads.length === 0 ? (
-                  <div className="text-sm text-gray-500">No downloads yet.</div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200 text-sm">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="px-4 py-2 text-left font-medium text-gray-600">Title</th>
-                          <th className="px-4 py-2 text-left font-medium text-gray-600">Subject</th>
-                          <th className="px-4 py-2 text-left font-medium text-gray-600">Sem</th>
-                          <th className="px-4 py-2 text-left font-medium text-gray-600">When</th>
-                          <th className="px-4 py-2"></th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-100">
-                        {recentDownloads.slice(0, 10).map((d) => (
-                          <tr key={d.id} className="hover:bg-gray-50">
-                            <td className="px-4 py-2 font-medium text-gray-900 truncate max-w-[260px]">{d.fileName}</td>
-                            <td className="px-4 py-2">{d.subject || '-'}</td>
-                            <td className="px-4 py-2">{d.semester ?? '-'}</td>
-                            <td className="px-4 py-2 text-xs text-gray-600">
-                              {d.downloadedAt && (d as any).downloadedAt?.seconds !== undefined
-                                ? new Date((d as any).downloadedAt.seconds * 1000).toLocaleString()
-                                : (d.downloadedAt instanceof Date ? d.downloadedAt.toLocaleString() : '-')}
-                            </td>
-                            <td className="px-4 py-2 text-right">
-                              {d.fileUrl ? (
-                                <a
-                                  href={d.fileUrl}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="inline-flex items-center px-3 py-1.5 bg-gray-100 text-gray-800 rounded-md hover:bg-gray-200"
-                                >
-                                  Open
-                                </a>
-                              ) : (
-                                <Link
-                                  to={`/resources?focus=${encodeURIComponent(d.resourceId)}`}
-                                  className="text-blue-600 hover:underline"
-                                >
-                                  View Resource
-                                </Link>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-
-              {/* Campus Resources */}
-              <div className="bg-white rounded-lg shadow-md p-6">
-                <h3 className="text-xl font-semibold text-gray-900 mb-4">Campus Resources</h3>
-                
-                {/* Filters */}
-                <div className="grid grid-cols-1 md:grid-cols-5 gap-3 mb-4">
-                  <select
-                    className="border border-gray-300 rounded-md px-3 py-2"
-                    value={filterSemester}
-                    onChange={(e) => setFilterSemester(e.target.value ? Number(e.target.value) : '')}
-                  >
-                    <option value="">All Semesters</option>
-                    {Array.from({ length: 8 }, (_, i) => i + 1).map((sem) => (
-                      <option key={sem} value={sem}>{sem}</option>
-                    ))}
-                  </select>
-                  <input
-                    className="border border-gray-300 rounded-md px-3 py-2"
-                    placeholder="Subject"
-                    value={filterSubject}
-                    onChange={(e) => setFilterSubject(e.target.value)}
-                  />
-                  <input
-                    className="border border-gray-300 rounded-md px-3 py-2"
-                    placeholder="Academic Year"
-                    value={filterYear}
-                    onChange={(e) => setFilterYear(e.target.value)}
-                  />
-                  <select
-                    className="border border-gray-300 rounded-md px-3 py-2"
-                    value={filterTerm}
-                    onChange={(e) => setFilterTerm(e.target.value as 'odd' | 'even' | '')}
-                  >
-                    <option value="">Odd/Even</option>
-                    <option value="odd">Odd</option>
-                    <option value="even">Even</option>
-                  </select>
-                  <select
-                    className="border border-gray-300 rounded-md px-3 py-2"
-                    value={filterType}
-                    onChange={(e) => setFilterType(e.target.value)}
-                  >
-                    <option value="">All Types</option>
-                    <option value="pdf">PDF</option>
-                    <option value="ppt">PPT</option>
-                    <option value="pptx">PPTX</option>
-                    <option value="doc">DOC</option>
-                    <option value="docx">DOCX</option>
-                    <option value="image">Images</option>
-                  </select>
-                </div>
-
-                {/* Quick filter toggle */}
-                <div className="flex items-center justify-between mb-4 text-sm">
-                  <div className="text-gray-600">Tip: Use filters to view past semesters.</div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setFilterSemester(studentUser.semester || '')}
-                      className="px-3 py-1.5 rounded-md border border-gray-300 hover:bg-gray-50"
-                    >
-                      My Semester
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setFilterSemester('')}
-                      className="px-3 py-1.5 rounded-md border border-gray-300 hover:bg-gray-50"
-                    >
-                      All Semesters
-                    </button>
-                  </div>
-                </div>
-
-                {/* Subject Chips */}
-                {uniqueSubjects.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mb-4">
-                    {uniqueSubjects.slice(0, 12).map((subj) => {
-                      const active = filterSubject.toLowerCase() === subj.toLowerCase();
-                      return (
-                        <button
-                          key={subj}
-                          onClick={() => setFilterSubject(active ? '' : subj)}
-                          className={`px-3 py-1.5 rounded-full text-sm border ${active ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}
-                        >
-                          {subj}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {/* Resources Table */}
-                {isLoadingResources ? (
-                  <div className="text-sm text-gray-500">Loading resources...</div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200 text-sm">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="px-4 py-2 text-left font-medium text-gray-600">Title</th>
-                          <th className="px-4 py-2 text-left font-medium text-gray-600">Subject</th>
-                          <th className="px-4 py-2 text-left font-medium text-gray-600">Sem</th>
-                          <th className="px-4 py-2 text-left font-medium text-gray-600">Year</th>
-                          <th className="px-4 py-2 text-left font-medium text-gray-600">Term</th>
-                          <th className="px-4 py-2 text-left font-medium text-gray-600">Type</th>
-                          <th className="px-4 py-2 text-left font-medium text-gray-600">Uploaded</th>
-                          <th className="px-4 py-2"></th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-100">
-                        {paginatedResources.map((r) => (
-                          <tr key={r.id} className="hover:bg-gray-50">
-                            <td className="px-4 py-2 font-medium text-gray-900 truncate max-w-[260px]">{r.fileName}</td>
-                            <td className="px-4 py-2">{r.subject}</td>
-                            <td className="px-4 py-2">{r.semester}</td>
-                            <td className="px-4 py-2">{r.academicYear}</td>
-                            <td className="px-4 py-2 capitalize">{r.term}</td>
-                            <td className="px-4 py-2">{r.fileType?.split('/')[1]?.toUpperCase() || 'File'}</td>
-                            <td className="px-4 py-2 text-xs text-gray-600">
-                              {r.uploadedAt && 'seconds' in (r.uploadedAt as any)
-                                ? new Date((r.uploadedAt as any).seconds * 1000).toLocaleString()
-                                : (r.uploadedAt instanceof Date ? r.uploadedAt.toLocaleString() : '-')}
-                            </td>
-                            <td className="px-4 py-2 space-x-2 text-right">
-                              <button
-                                onClick={() => openPreview(r.fileUrl, r.fileType)}
-                                className="inline-flex items-center px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                              >
-                                Preview
-                              </button>
-                              <a
-                                href={r.fileUrl}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="inline-flex items-center px-3 py-1.5 bg-gray-100 text-gray-800 rounded-md hover:bg-gray-200"
-                                onClick={() => logDownload(r)}
-                                download
-                              >
-                                Download
-                              </a>
-                            </td>
-                          </tr>
-                        ))}
-                        {filteredResources.length === 0 && (
-                          <tr>
-                            <td className="px-4 py-6 text-center text-gray-500" colSpan={8}>No resources found.</td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-
-                {/* Pagination */}
-                <div className="mt-4 flex items-center justify-between text-sm">
-                  <div className="flex items-center gap-2">
-                    <span className="text-gray-600">Rows per page:</span>
-                    <select
-                      className="border border-gray-300 rounded-md px-2 py-1"
-                      value={pageSize}
-                      onChange={(e) => setPageSize(Number(e.target.value))}
-                    >
-                      {[5, 10, 20, 50].map((n) => (
-                        <option key={n} value={n}>{n}</option>
+            {/* Resources Table */}
+            {isLoadingResources ? (
+              <div className="text-sm text-gray-500">Loading resources...</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200 text-sm">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      {['Title', 'Subject', 'Sem', 'Year', 'Term', 'Type', 'Uploaded', ''].map((h, i) => (
+                        <th key={i} className="px-4 py-2 text-left font-medium text-gray-600">{h}</th>
                       ))}
-                    </select>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-gray-600">Page {page} of {totalPages}</span>
-                    <div className="flex items-center gap-2">
-                      <button
-                        className="px-3 py-1.5 rounded-md border border-gray-300 disabled:opacity-50"
-                        onClick={() => setPage((p) => Math.max(1, p - 1))}
-                        disabled={page <= 1}
-                      >
-                        Prev
-                      </button>
-                      <button
-                        className="px-3 py-1.5 rounded-md border border-gray-300 disabled:opacity-50"
-                        onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                        disabled={page >= totalPages}
-                      >
-                        Next
-                      </button>
-                    </div>
-                  </div>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {paginatedResources.map((r) => (
+                      <tr key={r.id} className="hover:bg-gray-50">
+                        <td className="px-4 py-2 font-medium text-gray-900 truncate max-w-[260px]">{r.fileName}</td>
+                        <td className="px-4 py-2">{r.subject}</td>
+                        <td className="px-4 py-2">{r.semester}</td>
+                        <td className="px-4 py-2">{r.academicYear}</td>
+                        <td className="px-4 py-2 capitalize">{r.term}</td>
+                        <td className="px-4 py-2">{r.fileType?.split('/')[1]?.toUpperCase() || 'File'}</td>
+                        <td className="px-4 py-2 text-xs text-gray-600">
+                          {r.uploadedAt && 'seconds' in (r.uploadedAt as any)
+                            ? new Date((r.uploadedAt as any).seconds * 1000).toLocaleString()
+                            : '-'}
+                        </td>
+                        <td className="px-4 py-2 space-x-2 text-right">
+                          <button onClick={() => openPreview(r.fileUrl, r.fileType)} className="px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700">Preview</button>
+                          <a
+                            href={r.fileUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="px-3 py-1.5 bg-gray-100 text-gray-800 rounded-md hover:bg-gray-200"
+                            onClick={() => logDownload(r)}
+                            download
+                          >
+                            Download
+                          </a>
+                        </td>
+                      </tr>
+                    ))}
+                    {filteredResources.length === 0 && (
+                      <tr><td colSpan={8} className="text-center py-6 text-gray-500">No resources found.</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* Pagination */}
+            <div className="mt-4 flex items-center justify-between text-sm">
+              <div className="flex items-center gap-2">
+                <span>Rows per page:</span>
+                <select
+                  className="border border-gray-300 rounded-md px-2 py-1"
+                  value={pageSize}
+                  onChange={(e) => setPageSize(Number(e.target.value))}
+                >
+                  {[5, 10, 20, 50].map((n) => <option key={n}>{n}</option>)}
+                </select>
+              </div>
+              <div className="flex items-center gap-3">
+                <span>Page {page} of {totalPages}</span>
+                <div className="flex gap-2">
+                  <button className="px-3 py-1.5 border rounded-md disabled:opacity-50" disabled={page <= 1} onClick={() => setPage(p => Math.max(1, p - 1))}>Prev</button>
+                  <button className="px-3 py-1.5 border rounded-md disabled:opacity-50" disabled={page >= totalPages} onClick={() => setPage(p => Math.min(totalPages, p + 1))}>Next</button>
                 </div>
               </div>
             </div>
-
-            {/* Sidebar placeholder */}
-            <div className="space-y-6"></div>
           </div>
         </div>
       </div>
 
-      {/* Preview Modal */}
+      {/* --- Preview Modal --- */}
       {previewUrl && (
         <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-5xl h-[80vh] rounded-lg overflow-hidden shadow-xl relative">
             <button
               onClick={closePreview}
               className="absolute top-3 right-3 p-2 rounded-full bg-gray-100 hover:bg-gray-200"
-              aria-label="Close preview"
             >
               <X className="h-5 w-5" />
             </button>
@@ -543,7 +400,7 @@ const StudentDashboard: React.FC = () => {
                 />
               ) : (
                 <div className="h-full flex items-center justify-center text-gray-600 text-sm">
-                  Preview not available for this file type. Use Download instead.
+                  Preview not available. Please download to view.
                 </div>
               )}
             </div>
