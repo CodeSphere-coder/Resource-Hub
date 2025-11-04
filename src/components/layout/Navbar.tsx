@@ -1,7 +1,7 @@
 import React from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { BookOpen, User, LogOut, Upload, Home, GraduationCap, Users, Shield } from 'lucide-react';
+import { User, LogOut, Home, GraduationCap, Users, Shield } from 'lucide-react';
 
 const Navbar: React.FC = () => {
   const { currentUser, userProfile, logout } = useAuth();
@@ -18,7 +18,6 @@ const Navbar: React.FC = () => {
 
   const getRoleIcon = () => {
     if (!userProfile) return <User className="h-5 w-5" />;
-    
     switch (userProfile.role) {
       case 'student':
         return <GraduationCap className="h-5 w-5" />;
@@ -30,44 +29,58 @@ const Navbar: React.FC = () => {
         return <User className="h-5 w-5" />;
     }
   };
+
+  // Active link styling
+  const navLinkClass = ({ isActive }: { isActive: boolean }) =>
+    `flex items-center space-x-1 transition-colors ${
+      isActive ? 'text-blue-600 font-semibold' : 'text-gray-700 hover:text-blue-600'
+    }`;
+
   return (
     <nav className="bg-white shadow-lg sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
-        <Link to="/" className="flex items-center space-x-2">
-  <img
-    src="/logo.jpg"
-    alt="CSE Fortune Logo"
-    className="h-12 w-auto object-contain"
-  />
-</Link>
+          {/* Logo */}
+          <NavLink to="/" className="flex items-center space-x-2">
+            <img src="/logo.jpg" alt="CSE Fortune Logo" className="h-12 w-auto object-contain" />
+          </NavLink>
 
-
+          {/* Main navigation */}
           <div className="hidden md:flex items-center space-x-8">
             {currentUser && (
-              <Link 
+              <NavLink
                 to={
-                  userProfile?.role === 'student' ? '/student-dashboard' :
-                  userProfile?.role === 'teacher' ? '/teacher-dashboard' :
-                  userProfile?.role === 'admin' ? '/admin-dashboard' :
-                  '/student-dashboard'
-                } 
-                className="text-gray-700 hover:text-blue-600 transition-colors flex items-center space-x-1"
+                  userProfile?.role === 'student'
+                    ? '/student-dashboard'
+                    : userProfile?.role === 'teacher'
+                    ? '/teacher-dashboard'
+                    : userProfile?.role === 'admin'
+                    ? '/admin-dashboard'
+                    : '/student-dashboard'
+                }
+                className={navLinkClass}
               >
                 <Home className="h-4 w-4" />
                 <span>Dashboard</span>
-              </Link>
+              </NavLink>
             )}
-            <Link to="/" className="text-gray-700 hover:text-blue-600 transition-colors">Home</Link>
-            
-            <Link to="/resources" className="text-gray-700 hover:text-blue-600 transition-colors">Resources</Link>
-            
-  
-          {userProfile?.role === 'admin' && (
-              <Link to="/admin-dashboard" className="text-gray-700 hover:text-blue-600 transition-colors">Admin</Link>
+
+            <NavLink to="/" className={navLinkClass}>
+              Home
+            </NavLink>
+
+            <NavLink to="/resources" className={navLinkClass}>
+              Resources
+            </NavLink>
+
+            {userProfile?.role === 'admin' && (
+              <NavLink to="/admin-dashboard" className={navLinkClass}>
+                Admin
+              </NavLink>
             )}
           </div>
 
+          {/* Right side profile/logout */}
           <div className="flex items-center space-x-4">
             {currentUser ? (
               <div className="flex items-center space-x-4">
@@ -80,10 +93,17 @@ const Navbar: React.FC = () => {
                     </span>
                   )}
                 </div>
-                <Link to="/profile" className="flex items-center space-x-1 text-gray-700 hover:text-blue-600 transition-colors">
+                <NavLink
+                  to="/profile"
+                  className={({ isActive }) =>
+                    `flex items-center space-x-1 transition-colors ${
+                      isActive ? 'text-blue-600 font-semibold' : 'text-gray-700 hover:text-blue-600'
+                    }`
+                  }
+                >
                   <User className="h-5 w-5" />
                   <span className="hidden sm:inline">Profile</span>
-                </Link>
+                </NavLink>
                 <button
                   onClick={handleLogout}
                   className="flex items-center space-x-1 text-gray-700 hover:text-red-600 transition-colors"
@@ -94,18 +114,26 @@ const Navbar: React.FC = () => {
               </div>
             ) : (
               <div className="flex items-center space-x-2">
-                <Link
+                <NavLink
                   to="/login"
-                  className="px-4 py-2 text-blue-600 hover:text-blue-800 transition-colors"
+                  className={({ isActive }) =>
+                    `px-4 py-2 rounded transition-colors ${
+                      isActive ? 'text-blue-600 font-semibold' : 'text-blue-600 hover:text-blue-800'
+                    }`
+                  }
                 >
                   Login
-                </Link>
-                <Link
+                </NavLink>
+                <NavLink
                   to="/signup"
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  className={({ isActive }) =>
+                    `px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors ${
+                      isActive ? 'font-semibold' : ''
+                    }`
+                  }
                 >
                   Sign Up
-                </Link>
+                </NavLink>
               </div>
             )}
           </div>
