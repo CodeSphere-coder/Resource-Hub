@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { Users, Shield, FileText, AlertTriangle, CheckCircle, Activity, Upload } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { collection, deleteDoc, doc, getDocs, orderBy, query, updateDoc, where } from 'firebase/firestore';
+import { collection, deleteDoc, doc, getDocs, onSnapshot, orderBy, query, updateDoc, where } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { deleteFromCloudinaryByToken } from '../utils/cloudinary';
 
@@ -47,6 +47,7 @@ const AdminDashboard: React.FC = () => {
     blocked?: boolean;
   };
   type Resource = {
+    
     id: string;
     teacherId: string;
     teacherName: string;
@@ -75,7 +76,10 @@ const AdminDashboard: React.FC = () => {
   const uploadsPerTeacher = useMemo(() => {
     const map = new Map<string, number>();
     for (const r of resources) {
-      map.set(r.teacherName, (map.get(r.teacherName) || 0) + 1);
+      const role = (r as any).role;
+      const nameRaw = (r as any).teacherName || (role === 'admin' ? 'Admin' : (r as any).uploadedByName) || 'Unknown';
+      const name = String(nameRaw).trim() || 'Unknown';
+      map.set(name, (map.get(name) || 0) + 1);
     }
     return Array.from(map.entries()).sort((a, b) => b[1] - a[1]).slice(0, 10);
   }, [resources]);
@@ -86,7 +90,8 @@ const AdminDashboard: React.FC = () => {
   }, [resources]);
 
   useEffect(() => {
-    const fetchAll = async () => {
+    let unsubscribeResources: (() => void) | null = null;
+    const init = async () => {
       try {
         setLoadingUsers(true);
         const usersSnap = await getDocs(collection(db, 'users'));
@@ -95,17 +100,57 @@ const AdminDashboard: React.FC = () => {
       } finally {
         setLoadingUsers(false);
       }
-      try {
-        setLoadingResources(true);
-        const q = query(collection(db, 'resources'), orderBy('uploadedAt', 'desc'));
-        const resSnap = await getDocs(q);
-        const resData: Resource[] = resSnap.docs.map((d) => ({ id: d.id, ...(d.data() as any) }));
-        setResources(resData);
-      } finally {
-        setLoadingResources(false);
-      }
+
+      setLoadingResources(true);
+      const resCol = collection(db, 'resources');
+      unsubscribeResources = onSnapshot(
+        resCol,
+        (resSnap) => {
+          const resData: Resource[] = resSnap.docs.map((d) => {
+            const data: any = d.data();
+            // Try multiple possible semester fields
+            const rawSemester = (
+              data.semester ??
+              data.sem ??
+              data.semesterNo ??
+              data.semNo ??
+              data.semester_number ??
+              data.semesterIndex
+            );
+            let semesterNumber: number;
+            if (typeof rawSemester === 'number') {
+              semesterNumber = rawSemester;
+            } else {
+              const match = String(rawSemester ?? '').match(/\d+/);
+              semesterNumber = match ? parseInt(match[0], 10) : 0;
+            }
+            if (semesterNumber < 1 || semesterNumber > 8) {
+              semesterNumber = 0;
+            }
+            return {
+              id: d.id,
+              ...data,
+              semester: semesterNumber,
+            } as Resource;
+          });
+          // Optional: sort locally by uploadedAt desc if present
+          resData.sort((a: any, b: any) => {
+            const aMs = a?.uploadedAt?.seconds ? a.uploadedAt.seconds * 1000 : (a?.uploadedAt instanceof Date ? a.uploadedAt.getTime() : 0);
+            const bMs = b?.uploadedAt?.seconds ? b.uploadedAt.seconds * 1000 : (b?.uploadedAt instanceof Date ? b.uploadedAt.getTime() : 0);
+            return bMs - aMs;
+          });
+          setResources(resData);
+          setLoadingResources(false);
+        },
+        () => {
+          setLoadingResources(false);
+        }
+      );
     };
-    fetchAll();
+    init();
+    return () => {
+      if (unsubscribeResources) unsubscribeResources();
+    };
   }, []);
 
   const groupedBySemSubject = useMemo(() => {
@@ -308,7 +353,7 @@ const AdminDashboard: React.FC = () => {
                             <td className="px-3 py-2 text-right">
                               <button
                                 onClick={() => deleteResource(r)}
-                                className="px-3 py-1.5 rounded-md bg-red-600 text-white"
+                                className="px-3 py-1.5 rounded-md bg-red-400 hover:bg-red-500 text-white"
                               >
                                 Delete
                               </button>
@@ -422,7 +467,8 @@ const AdminDashboard: React.FC = () => {
 
             {/* Faculty Resource Count */}
             <div className="bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg p-4 text-white">
-              <h3 className="font-bold mb-3">Faculty Resources</h3>
+              <h3 className="font-bold">Faculty Resources</h3>
+              <div className="text-white/80 text-xs mb-3">Includes resources shared by Admin</div>
               <div className="space-y-2 text-sm max-h-64 overflow-y-auto">
                 {uploadsPerTeacher.length > 0 ? (
                   uploadsPerTeacher.map(([teacherName, count]) => (
