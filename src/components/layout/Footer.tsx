@@ -17,15 +17,7 @@ const Footer: React.FC = () => {
             </p>
           </div>
           
-          <div>
-            <h3 className="text-lg font-semibold mb-4">Quick Links</h3>
-            <ul className="space-y-2">
-              <li><a href="/resources" className="text-gray-300 hover:text-white transition-colors">Browse Resources</a></li>
-              <li><a href="/semesters" className="text-gray-300 hover:text-white transition-colors">By Semester</a></li>
-              <li><a href="/upload" className="text-gray-300 hover:text-white transition-colors">Upload Resource</a></li>
-              <li><a href="/guidelines" className="text-gray-300 hover:text-white transition-colors">Guidelines</a></li>
-            </ul>
-          </div>
+           
           
           <div>
             <h3 className="text-lg font-semibold mb-4">Connect</h3>

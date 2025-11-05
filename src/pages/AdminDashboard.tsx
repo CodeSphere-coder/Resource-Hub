@@ -329,11 +329,10 @@ const AdminDashboard: React.FC = () => {
                       <thead className="bg-gray-50">
                         <tr>
                           <th className="px-3 py-2 text-left">Title</th>
-                          <th className="px-3 py-2 text-left">Teacher</th>
+                          <th className="px-3 py-2 text-left">Role</th>
                           <th className="px-3 py-2 text-left">Year</th>
                           <th className="px-3 py-2 text-left">Term</th>
                           <th className="px-3 py-2 text-left">Type</th>
-                          <th className="px-3 py-2 text-left">Uploaded</th>
                           <th className="px-3 py-2 text-right"></th>
                         </tr>
                       </thead>
@@ -341,15 +340,10 @@ const AdminDashboard: React.FC = () => {
                         {items.map((r) => (
                           <tr key={r.id} className="hover:bg-gray-50">
                             <td className="px-3 py-2 truncate max-w-[260px]">{r.fileName}</td>
-                            <td className="px-3 py-2">{r.teacherName}</td>
+                            <td className="px-3 py-2">{(users.find(u => u.uid === r.teacherId)?.role) || (r as any).role || 'teacher'}</td>
                             <td className="px-3 py-2">{r.academicYear}</td>
                             <td className="px-3 py-2 capitalize">{r.term}</td>
                             <td className="px-3 py-2">{r.fileType?.split('/')[1]?.toUpperCase() || 'File'}</td>
-                            <td className="px-3 py-2 text-xs text-gray-600">
-                              {r.uploadedAt && (r as any).uploadedAt?.seconds
-                                ? new Date((r as any).uploadedAt.seconds * 1000).toLocaleString()
-                                : (r.uploadedAt instanceof Date ? r.uploadedAt.toLocaleString() : '-')}
-                            </td>
                             <td className="px-3 py-2 text-right">
                               <button
                                 onClick={() => deleteResource(r)}
