@@ -163,7 +163,7 @@ const firebaseConfig = {
 
 1. Create a Cloudinary account at [Cloudinary](https://cloudinary.com/)
 2. Create an unsigned upload preset named `campus_unsigned`
-3. Update `src/utils/cloudinary.ts` with your Cloudinary cloud name:
+3. Update `src/utils/` with your Cloudinary cloud name:
 
 ```typescript
 export const CLOUD_NAME = 'your-cloud-name';

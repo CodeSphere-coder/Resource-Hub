@@ -19,7 +19,6 @@ const Resources: React.FC = () => {
   ];
 
   type Role = 'admin' | 'teacher' | 'student';
-
   type Resource = {
     id: string;
     teacherId?: string;
@@ -150,8 +149,22 @@ const Resources: React.FC = () => {
     const q = searchQuery.trim().toLowerCase();
     return items.filter((r) => {
       const matchesTerm = term ? (term === 'odd' ? r.semester % 2 === 1 : r.semester % 2 === 0) : true;
-      const matchesQuery = q ? (r.fileName.toLowerCase().includes(q) || r.subject.toLowerCase().includes(q)) : true;
       const matchesSemester = selectedSemester ? r.semester === selectedSemester : true;
+      const fileTypeLower = (r.fileType || '').toLowerCase();
+      const fileTypeShort = fileTypeLower.includes('/') ? fileTypeLower.split('/')[1] : fileTypeLower;
+      const haystack = [
+        r.fileName || '',
+        r.subject || '',
+        r.teacherName || '',
+        r.subjectCode || '',
+        r.academicYear || '',
+        r.term || '',
+        `sem ${r.semester}`,
+        String(r.semester || ''),
+        fileTypeLower,
+        fileTypeShort,
+      ].join(' ').toLowerCase();
+      const matchesQuery = q ? haystack.includes(q) : true;
       return matchesTerm && matchesQuery && matchesSemester;
     });
   }, [items, searchQuery, term, selectedSemester]);

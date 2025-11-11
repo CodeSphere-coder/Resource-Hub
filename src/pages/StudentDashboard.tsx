@@ -4,7 +4,6 @@ import { BookOpen, Upload, Download, Search, Filter, FileText, Code, Calculator,
 import { Link } from 'react-router-dom';
 import {
   collection,
-  getDocs,
   orderBy,
   query,
   onSnapshot,
@@ -76,22 +75,59 @@ const StudentDashboard: React.FC = () => {
     if (studentUser?.semester) setFilterSemester(studentUser.semester);
   }, [studentUser]);
 
-  // --- Fetch Resources ---
+  // --- Real-time Resources ---
   useEffect(() => {
-    const fetchResources = async () => {
-      try {
-        setIsLoadingResources(true);
-        const q = query(collection(db, 'resources'), orderBy('uploadedAt', 'desc'));
-        const snap = await getDocs(q);
-        const items: Resource[] = snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) }));
+    setIsLoadingResources(true);
+    const qRef = query(collection(db, 'resources'));
+    const unsubscribe = onSnapshot(
+      qRef,
+      (snap) => {
+        const items: Resource[] = snap.docs.map((d) => {
+          const data: any = d.data();
+          // Normalize semester from various possible fields
+          const rawSemester = (
+            data.semester ??
+            data.sem ??
+            data.semesterNo ??
+            data.semNo ??
+            data.semester_number ??
+            data.semesterIndex
+          );
+          let semesterNumber: number;
+          if (typeof rawSemester === 'number') {
+            semesterNumber = rawSemester;
+          } else {
+            const match = String(rawSemester ?? '').match(/\d+/);
+            semesterNumber = match ? parseInt(match[0], 10) : 0;
+          }
+          if (semesterNumber < 1 || semesterNumber > 8) {
+            semesterNumber = 0;
+          }
+          const resource: Resource = {
+            id: d.id,
+            ...data,
+            semester: semesterNumber,
+          };
+          return resource;
+        });
+        // Local sort by uploadedAt desc (supports Firestore Timestamp or Date)
+        items.sort((a: any, b: any) => {
+          const aMs = a?.uploadedAt?.seconds
+            ? a.uploadedAt.seconds * 1000
+            : (a?.uploadedAt instanceof Date ? a.uploadedAt.getTime() : 0);
+          const bMs = b?.uploadedAt?.seconds
+            ? b.uploadedAt.seconds * 1000
+            : (b?.uploadedAt instanceof Date ? b.uploadedAt.getTime() : 0);
+          return bMs - aMs;
+        });
         setResources(items);
-      } catch (e) {
-        console.error('Failed to load resources', e);
-      } finally {
+        setIsLoadingResources(false);
+      },
+      () => {
         setIsLoadingResources(false);
       }
-    };
-    fetchResources();
+    );
+    return () => unsubscribe();
   }, []);
 
   // --- Real-time Listener for Downloads ---
