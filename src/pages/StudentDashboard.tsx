@@ -1,6 +1,6 @@
  import React, { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { BookOpen, Upload, Download, Search, Filter, FileText, Code, Calculator,Trash2, Folder, ChevronDown, ChevronRight, X } from 'lucide-react';
+import { BookOpen, Upload, Download, Search, Filter, FileText, Code, Calculator,Trash2, Folder, ChevronDown, ChevronRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import {
   collection,
@@ -67,8 +67,6 @@ const StudentDashboard: React.FC = () => {
   const [filterType, setFilterType] = useState<string>('');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-  const [previewUrl, setPreviewUrl] = useState<string>();
-  const [previewType, setPreviewType] = useState<string>();
 
   // --- Auto-set default semester ---
   useEffect(() => {
@@ -176,34 +174,23 @@ const StudentDashboard: React.FC = () => {
   useEffect(() => setPage(1), [filterSemester, filterSubject, filterYear, filterTerm, filterType, pageSize]);
 
   // --- Helpers ---
-  const openPreview = (url: string, type: string) => {
-    setPreviewUrl(url);
-    setPreviewType(type);
-  };
-  const closePreview = () => {
-    setPreviewUrl(undefined);
-    setPreviewType(undefined);
-  };
-  const logDownload = (r: Resource) => {
+  const logDownload = async (r: Resource) => {
     if (!studentUser?.uid) return;
-    addDoc(collection(db, 'users', studentUser.uid, 'downloads'), {
-      resourceId: r.id,
-      fileName: r.fileName,
-      subject: r.subject,
-      semester: r.semester,
-      fileUrl: r.fileUrl,
-      fileType: r.fileType,
-      downloadedAt: serverTimestamp(),
-    });
-    updateDoc(doc(db, 'resources', r.id), { downloads: increment(1) });
+    try {
+      await addDoc(collection(db, 'users', studentUser.uid, 'downloads'), {
+        resourceId: r.id,
+        fileName: r.fileName,
+        subject: r.subject,
+        semester: r.semester,
+        fileUrl: r.fileUrl,
+        fileType: r.fileType,
+        downloadedAt: serverTimestamp(),
+      });
+      await updateDoc(doc(db, 'resources', r.id), { downloads: increment(1) });
+    } catch (error) {
+      console.error('Error logging download:', error);
+    }
   };
-
-  const isImage = (t: string) => t.startsWith('image/');
-  const isPdf = (t: string, n?: string) => t === 'application/pdf' || (n || '').endsWith('.pdf');
-  const isDoc = (t: string, n?: string) =>
-    t.includes('msword') || t.includes('officedocument.wordprocessingml') || (n || '').endsWith('.docx');
-  const isPpt = (t: string, n?: string) =>
-    t.includes('powerpoint') || t.includes('officedocument.presentationml') || (n || '').endsWith('.pptx');
 
   // --- Stats + Actions ---
    const stats = [
@@ -362,18 +349,47 @@ const StudentDashboard: React.FC = () => {
                             ? new Date((r.uploadedAt as any).seconds * 1000).toLocaleString()
                             : '-'}
                         </td>
-                        <td className="px-4 py-2 space-x-2 text-right">
-                          <button onClick={() => openPreview(r.fileUrl, r.fileType)} className="px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700">Preview</button>
-                          <a
-                            href={r.fileUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="px-3 py-1.5 bg-gray-100 text-gray-800 rounded-md hover:bg-gray-200"
-                            onClick={() => logDownload(r)}
-                            download
-                          >
-                            Download
-                          </a>
+                        <td className="px-4 py-2 text-right">
+                          <div className="flex items-center justify-end space-x-2">
+                            {(() => {
+                              const fileTypeLower = (r.fileType || '').toLowerCase();
+                              const fileNameLower = (r.fileName || '').toLowerCase();
+                              const isPdf = fileTypeLower.includes('pdf') || fileNameLower.endsWith('.pdf');
+                              const directUrl = r.fileUrl;
+                              
+                              if (!directUrl) {
+                                return <span className="text-gray-400 text-xs">No URL</span>;
+                              }
+                              
+                              return (
+                                <>
+                                  <a 
+                                    href={directUrl} 
+                                    target="_blank" 
+                                    rel="noreferrer" 
+                                    className="text-blue-600 hover:text-blue-900 transition-colors cursor-pointer"
+                                    title="Download/Open"
+                                    onClick={() => {
+                                      logDownload(r);
+                                    }}
+                                  >
+                                    <FileText className="h-4 w-4" />
+                                  </a>
+                                  {isPdf && (
+                                    <a
+                                      href={directUrl}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="text-green-600 hover:text-green-900 transition-colors cursor-pointer"
+                                      title="View PDF"
+                                    >
+                                      <BookOpen className="h-4 w-4" />
+                                    </a>
+                                  )}
+                                </>
+                              );
+                            })()}
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -408,41 +424,6 @@ const StudentDashboard: React.FC = () => {
           </div>
         </div>
       </div>
-
-      {/* --- Preview Modal --- */}
-      {previewUrl && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-5xl h-[80vh] rounded-lg overflow-hidden shadow-xl relative">
-            <button
-              onClick={closePreview}
-              className="absolute top-3 right-3 p-2 rounded-full bg-gray-100 hover:bg-gray-200"
-            >
-              <X className="h-5 w-5" />
-            </button>
-            <div className="w-full h-full bg-gray-50">
-              {isImage(previewType || '') ? (
-                <img src={previewUrl!} alt="Preview" className="w-full h-full object-contain" />
-              ) : isPdf(previewType || '') ? (
-                <iframe
-                  title="PDF Preview"
-                  src={`https://drive.google.com/viewerng/viewer?embedded=1&url=${encodeURIComponent(previewUrl!)}`}
-                  className="w-full h-full"
-                />
-              ) : isDoc(previewType || '') || isPpt(previewType || '') ? (
-                <iframe
-                  title="Doc Preview"
-                  src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(previewUrl!)}`}
-                  className="w-full h-full"
-                />
-              ) : (
-                <div className="h-full flex items-center justify-center text-gray-600 text-sm">
-                  Preview not available. Please download to view.
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
     </>
   );
 };
